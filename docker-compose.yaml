@@ -1,0 +1,35 @@
+services:
+  dmarc_analyzer:
+    build: .
+    volumes:
+      - ./files:/app/files
+      - dmarc_db:/var/lib/dmarc
+    networks:
+      - dmarc_network
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DB_PATH=/var/lib/dmarc/dmarc.db
+    command: ["python", "dmarc_analyzer.py"]
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - dmarc_network
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_INSTALL_PLUGINS=frser-sqlite-datasource
+    volumes:
+      - grafana_storage:/var/lib/grafana
+      - dmarc_db:/var/lib/grafana/data:ro
+    depends_on:
+      - dmarc_analyzer
+
+networks:
+  dmarc_network: {}
+
+volumes:
+  grafana_storage: {}
+  dmarc_db: {}
