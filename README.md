@@ -25,7 +25,7 @@ cd DMARC_Analyzer
 
 2. 必要なディレクトリの作成：
 ```bash
-mkdir -p files data
+mkdir -p files 
 ```
 
 3. システムの起動：
@@ -74,7 +74,6 @@ docker-compose restart dmarc_analyzer
 ```bash
 # すべてを停止してクリーンアップ
 docker-compose down
-rm -rf ./data/*
 
 # 再ビルドして起動
 docker-compose build --no-cache
@@ -99,6 +98,30 @@ docker-compose logs -f dmarc_analyzer
 ```bash
 docker-compose restart grafana
 ```
+
+### 異なるドメインのデータを分析する場合
+
+
+# 1. 既存のコンテナを停止
+docker-compose down
+
+# 2. filesディレクトリの中身をクリア
+Remove-Item .\files\* -Force
+
+# 3. 新しいファイルを配置
+Copy-Item "新しいDMARCレポート.zip" .\files\
+
+# 4. リセットスクリプトを実行
+.\reset-analysis.sh
+
+#### PowerShellで実行する場合
+.\reset-analysis.ps1
+
+##### または個別のコマンドで実行
+docker-compose down -v
+docker-compose build --no-cache
+docker-compose up -d
+docker-compose logs -f dmarc_analyzer
 
 ## ダッシュボードの説明
 

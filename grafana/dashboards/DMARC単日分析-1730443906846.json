@@ -1,0 +1,285 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 2,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "P90DAF5EEE766B0A3"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 80
+              },
+              {
+                "color": "green",
+                "value": 95
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "組織",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "sqlite"
+          },
+          "queryText": "-- 組織別の詳細エラー分析\nSELECT \n    organization as \"組織\",\n    spf_result as \"SPF結果\",\n    dkim_result as \"DKIM結果\",\n    COUNT(*) as \"レコード数\",\n    SUM(count) as \"メール数\"\nFROM dmarc_aggregate\nWHERE spf_result != 'pass' OR dkim_result != 'pass'\nGROUP BY organization, spf_result, dkim_result\nORDER BY organization, \"メール数\" DESC;",
+          "queryType": "table",
+          "rawQuery": true,
+          "rawQueryText": "-- 組織別の詳細エラー分析\nSELECT \n    organization as \"組織\",\n    spf_result as \"SPF結果\",\n    dkim_result as \"DKIM結果\",\n    COUNT(*) as \"レコード数\",\n    SUM(count) as \"メール数\"\nFROM dmarc_aggregate\nWHERE spf_result != 'pass' OR dkim_result != 'pass'\nGROUP BY organization, spf_result, dkim_result\nORDER BY organization, \"メール数\" DESC;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "ts"
+          ]
+        }
+      ],
+      "title": "本日の概要",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "P90DAF5EEE766B0A3"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "always",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "認証成功率"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "認証エラー数"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "min"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "sqlite"
+          },
+          "queryText": "-- 時間帯別の認証結果\nSELECT \n    created_at as \"time\",\n    organization as \"組織\",\n    SUM(count) as \"総メール数\",\n    SUM(CASE WHEN spf_result = 'pass' AND dkim_result = 'pass' THEN count ELSE 0 END) as \"認証成功数\",\n    SUM(CASE WHEN spf_result != 'pass' OR dkim_result != 'pass' THEN count ELSE 0 END) as \"認証エラー数\",\n    ROUND(SUM(CASE WHEN spf_result = 'pass' AND dkim_result = 'pass' THEN count ELSE 0 END) * 100.0 / SUM(count), 2) as \"認証成功率\"\nFROM dmarc_aggregate\nGROUP BY created_at, organization\nORDER BY created_at;",
+          "queryType": "table",
+          "rawQuery": true,
+          "rawQueryText": "-- 時間帯別の認証結果\nSELECT \n    created_at as \"time\",\n    organization as \"組織\",\n    SUM(count) as \"総メール数\",\n    SUM(CASE WHEN spf_result = 'pass' AND dkim_result = 'pass' THEN count ELSE 0 END) as \"認証成功数\",\n    SUM(CASE WHEN spf_result != 'pass' OR dkim_result != 'pass' THEN count ELSE 0 END) as \"認証エラー数\",\n    ROUND(SUM(CASE WHEN spf_result = 'pass' AND dkim_result = 'pass' THEN count ELSE 0 END) * 100.0 / SUM(count), 2) as \"認証成功率\"\nFROM dmarc_aggregate\nGROUP BY created_at, organization\nORDER BY created_at;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "ts"
+          ]
+        }
+      ],
+      "title": "時間帯別認証結果",
+      "type": "timeseries"
+    }
+  ],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 40,
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "DMARC単日分析",
+  "uid": "ee2lviz8ilreof",
+  "version": 5,
+  "weekStart": ""
+}

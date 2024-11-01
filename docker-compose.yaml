@@ -9,7 +9,11 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - DB_PATH=/var/lib/dmarc/dmarc.db
-    command: ["python", "dmarc_analyzer.py"]
+    # コンテナを維持するための設定
+    tty: true
+    stdin_open: true
+    # 終了後もコンテナを維持
+    command: tail -f /dev/null
 
   grafana:
     image: grafana/grafana

@@ -7,8 +7,6 @@ import sqlite3
 from datetime import datetime
 import io
 
-
-
 print("Starting DMARC analysis...")
 
 # パス設定
@@ -18,7 +16,18 @@ DB_PATH = os.getenv('DB_PATH', '/var/lib/dmarc/dmarc.db')
 # データベースディレクトリの作成
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
-
+def extract_report_date(filename):
+    """ファイル名からレポート期間の開始日を抽出"""
+    try:
+        # ファイル名のフォーマット: domain!start_timestamp!end_timestamp
+        parts = filename.split('!')
+        if len(parts) >= 3:
+            # 開始時刻のタイムスタンプを使用
+            timestamp = parts[-2]  # start_timestamp
+            return datetime.fromtimestamp(int(timestamp)).strftime('%Y-%m-%d %H:%M:%S')
+    except Exception as e:
+        print(f"Error extracting date from filename {filename}: {e}")
+        return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 def extract_file(file_path):
     """ネストされたZIPファイルからXMLを抽出"""
@@ -83,7 +92,7 @@ def create_database():
         spf_aligned TEXT,
         dkim_aligned TEXT,
         dmarc_result TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP
     )
     ''')
     
@@ -97,14 +106,14 @@ def create_database():
         spf_result TEXT,
         dkim_result TEXT,
         dmarc_result TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP
     )
     ''')
     
     conn.commit()
     conn.close()
 
-def process_report(report):
+def process_report(report, report_date):
     """DMARCレポートを処理"""
     try:
         if 'feedback' not in report:
@@ -137,7 +146,6 @@ def process_report(report):
                 source_ip = row.get('source_ip', 'unknown')
                 count = int(row.get('count', 0))
                 
-                # SPFとDKIMの結果を取得
                 spf = auth_results.get('spf', {})
                 dkim = auth_results.get('dkim', {})
                 
@@ -156,6 +164,7 @@ def process_report(report):
                     'spf_aligned': policy_published.get('aspf', 'none'),
                     'dkim_aligned': policy_published.get('adkim', 'none'),
                     'dmarc_result': dmarc_result,
+                    'created_at': report_date
                 })
                 
                 identifiers = record.get('identifiers', {})
@@ -166,6 +175,7 @@ def process_report(report):
                     'spf_result': spf_result,
                     'dkim_result': dkim_result,
                     'dmarc_result': dmarc_result,
+                    'created_at': report_date
                 })
                 
             except Exception as e:
@@ -220,9 +230,13 @@ def parse_reports():
             file_path = os.path.join(DATA_PATH, file_name)
             print(f"Processing: {file_path}")
             
+            # ファイル名から日付を抽出
+            report_date = extract_report_date(file_name)
+            print(f"Extracted report date: {report_date}")
+            
             for report in extract_file(file_path):
                 if report:
-                    agg, err = process_report(report)
+                    agg, err = process_report(report, report_date)
                     if agg:
                         aggregate_data.extend(agg)
                     if err:

@@ -1,14 +1,12 @@
-# ベースイメージ
 FROM python:3.9-slim
 
-# 必要なパッケージをインストール
+# 必要なパッケージをインストール（sqlite3を追加）
 RUN apt-get update && apt-get install -y \
     unzip \
     build-essential \
     sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
-# 作業ディレクトリを作成
 WORKDIR /app
 
 # requirements.txtをコピーしてインストール
@@ -18,9 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # ソースコードをコピー
 COPY src /app
 
-# データベース用ディレクトリを作成し、権限を設定
-RUN mkdir -p /var/lib/dmarc && \
-    chmod 777 /var/lib/dmarc
+# データベースディレクトリを作成
+RUN mkdir -p /var/lib/dmarc
 
-# Pythonのバッファリングを無効化
 ENV PYTHONUNBUFFERED=1

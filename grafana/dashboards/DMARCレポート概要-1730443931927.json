@@ -1,0 +1,229 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 1,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "P90DAF5EEE766B0A3"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "always",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SPF成功率"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DKIM成功率"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SPFエラー数"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DKIMエラー数"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max",
+            "min"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "timezone": [
+          "browser"
+        ],
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xAxis": {
+          "mode": "time",
+          "timeFormat": "YYYY-MM-DD"
+        }
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "queryText": "SELECT \n    date(created_at) || ' 00:00:00' as \"time\",\n    organization as \"組織\",\n    SUM(CASE WHEN spf_result != 'pass' THEN count ELSE 0 END) as \"SPFエラー数\",\n    SUM(CASE WHEN dkim_result != 'pass' THEN count ELSE 0 END) as \"DKIMエラー数\",\n    ROUND(SUM(CASE WHEN spf_result = 'pass' THEN count ELSE 0 END) * 100.0 / SUM(count), 2) as \"SPF成功率\",\n    ROUND(SUM(CASE WHEN dkim_result = 'pass' THEN count ELSE 0 END) * 100.0 / SUM(count), 2) as \"DKIM成功率\"\nFROM dmarc_aggregate\nGROUP BY date(created_at), organization\nORDER BY time;",
+          "queryType": "table",
+          "rawQueryText": "SELECT \n    date(created_at) || ' 00:00:00' as \"time\",\n    organization as \"組織\",\n    SUM(CASE WHEN spf_result != 'pass' THEN count ELSE 0 END) as \"SPFエラー数\",\n    SUM(CASE WHEN dkim_result != 'pass' THEN count ELSE 0 END) as \"DKIMエラー数\",\n    ROUND(SUM(CASE WHEN spf_result = 'pass' THEN count ELSE 0 END) * 100.0 / SUM(count), 2) as \"SPF成功率\",\n    ROUND(SUM(CASE WHEN dkim_result = 'pass' THEN count ELSE 0 END) * 100.0 / SUM(count), 2) as \"DKIM成功率\"\nFROM dmarc_aggregate\nGROUP BY date(created_at), organization\nORDER BY time;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "ts"
+          ]
+        }
+      ],
+      "title": "DMARC認証結果の日次推移",
+      "type": "timeseries"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 40,
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "DMARCレポート概要",
+  "uid": "ee2lgvv68smbkb",
+  "version": 10,
+  "weekStart": ""
+}

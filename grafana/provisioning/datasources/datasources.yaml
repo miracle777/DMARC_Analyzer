@@ -1,0 +1,9 @@
+# grafana/provisioning/datasources/datasources.yaml
+apiVersion: 1
+datasources:
+  - name: DMARC Data
+    type: frser-sqlite-datasource
+    access: proxy
+    isDefault: true
+    jsonData:
+      path: /var/lib/grafana/data/dmarc.db
