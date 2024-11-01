@@ -119,19 +119,19 @@ docker-compose restart grafana
 
 
 
-# 1. 既存のコンテナを停止
+#### 1. 既存のコンテナを停止
 docker-compose down
 
 
-# 2. filesディレクトリの中身をクリア
+#### 2. filesディレクトリの中身をクリア
 Remove-Item .\files\* -Force
 
 
-# 3. 新しいファイルを配置
+#### 3. 新しいファイルを配置
 Copy-Item "新しいDMARCレポート.zip" .\files\
 
 
-# 4. リセットスクリプトを実行
+#### 4. リセットスクリプトを実行
 .\reset-analysis.sh
 
 #### PowerShellで実行する場合
