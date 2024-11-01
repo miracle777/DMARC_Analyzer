@@ -123,19 +123,121 @@ docker-compose build --no-cache
 docker-compose up -d
 docker-compose logs -f dmarc_analyzer
 
-## ダッシュボードの説明
 
-1. メイン画面の構成：
-   - 認証結果の分布（円グラフ）
-   - 組織別メール数と認証結果（棒グラフ）
-   - 時系列での認証状況推移（折れ線グラフ）
-   - エラー詳細テーブル
+## Grafanaダッシュボードの管理
 
-2. 主な分析項目：
-   - SPF/DKIM認証結果の統計
-   - 組織別のメール送信状況
-   - 時系列でのエラー推移
-   - 詳細なエラーレポート
+### ダッシュボード構成
+
+1. `dmarc_summary_dashboard.json`
+   - 概要：DMARCレポートの概要ダッシュボード
+   - 主な機能：
+     - 分析対象ドメインの情報表示
+     - SPF/DKIM認証結果の全体概要
+     - 組織別の認証状況
+
+2. `dmarc_daily_analysis.json`
+   - 概要：単日のDMARC詳細分析用ダッシュボード
+   - 主な機能：
+     - 時間帯別の認証結果推移
+     - 詳細なエラー分析
+     - 送信元IPごとの分析
+
+3. `dmarc_trend_analysis.json`
+   - 概要：長期トレンド分析用ダッシュボード
+   - 主な機能：
+     - 日次の認証結果推移
+     - 組織別の認証成功率トレンド
+     - 週次/月次のサマリー
+
+### ダッシュボードの更新手順
+
+1. エクスポート：
+   ```
+   1. Grafana UIで対象のダッシュボードを開く
+   2. 設定（⚙）アイコン → Share dashboard → Export
+   3. 'Export for sharing externally' を選択
+   4. 'Save to file' をクリック
+   ```
+
+2. 保存：
+   - エクスポートしたJSONファイルを `grafana/dashboards/` ディレクトリに保存
+   - ファイル名規則に従って保存（例：dmarc_summary_dashboard.json）
+
+3. バージョン管理：
+   - 変更内容をコミット
+   - 変更履歴を記録（どのような更新を行ったか）
+
+### ダッシュボードの説明
+
+#### 概要ダッシュボード（dmarc_summary_dashboard.json）
+- 目的：DMARCレポートの全体像を把握
+- 主要パネル：
+  - 分析対象ドメイン情報
+  - SPF/DKIM認証結果の分布
+  - 組織別メール数と認証結果
+
+#### 単日分析ダッシュボード（dmarc_daily_analysis.json）
+- 目的：特定日の詳細な認証結果分析
+- 主要パネル：
+  - 時間帯別認証結果グラフ
+  - エラー詳細テーブル
+  - 送信元IP分析
+
+#### トレンド分析ダッシュボード（dmarc_trend_analysis.json）
+- 目的：長期的な認証結果の傾向分析
+- 主要パネル：
+  - 日次認証結果推移
+  - 組織別サマリー
+  - 週次トレンドグラフ
+
+### 注意事項
+- ダッシュボードの更新時は必ずバックアップを作成
+- 重要な変更は事前にテスト環境で確認
+- パネルの配置や設定を変更した場合は、その内容をREADMEに反映
+
+### トラブルシューティング
+1. ダッシュボードが表示されない場合：
+   ```bash
+   # Grafanaコンテナの再起動
+   docker-compose restart grafana
+   ```
+
+2. データが更新されない場合：
+   ```bash
+   # DMARCアナライザーの再実行
+   ./reset-analysis.ps1
+   ```
+
+### 運用手順：
+#### ダッシュボードの更新時：
+1. Grafana UIでダッシュボードを編集
+2. Share dashboard → Export → Save to file
+3. ダウンロードしたJSONを grafana/dashboards/ に保存
+
+#### システムの再構築時：
+完全なリセットと再構築
+.\reset-analysis.ps1
+
+#### 新しい環境へのデプロイ時：
+# 必要なファイルをコピー
+grafana/
+docker-compose.yaml
+Dockerfile
+src/
+
+### Grafanaダッシュボードの管理
+
+1. ダッシュボードのエクスポート：
+   - Grafana UIで Share dashboard → Export
+   - JSONファイルを `grafana/dashboards/` に保存
+
+2. ダッシュボードの更新：
+   - JSONファイルを編集または置き換え
+   - システムを再起動: `docker-compose restart grafana`
+
+3. 新しいダッシュボードの追加：
+   - JSONファイルを `grafana/dashboards/` に配置
+   - `grafana/provisioning/dashboards/dashboards.yaml` を必要に応じて更新
 
 ## 設定のカスタマイズ
 

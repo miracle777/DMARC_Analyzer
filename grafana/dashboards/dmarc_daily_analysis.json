@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
+  "id": 1,
   "links": [],
   "panels": [
     {
@@ -75,8 +75,8 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 10,
-        "w": 24,
+        "h": 13,
+        "w": 11,
         "x": 0,
         "y": 0
       },
@@ -222,9 +222,9 @@
       },
       "gridPos": {
         "h": 13,
-        "w": 24,
-        "x": 0,
-        "y": 10
+        "w": 13,
+        "x": 11,
+        "y": 0
       },
       "id": 2,
       "options": {
@@ -280,6 +280,6 @@
   "timezone": "",
   "title": "DMARC単日分析",
   "uid": "ee2lviz8ilreof",
-  "version": 5,
+  "version": 2,
   "weekStart": ""
 }

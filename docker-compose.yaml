@@ -3,17 +3,15 @@ services:
     build: .
     volumes:
       - ./files:/app/files
-      - dmarc_db:/var/lib/dmarc
+      - dmarc_data:/var/lib/dmarc    # 修正: dmarc_db → dmarc_data
     networks:
       - dmarc_network
     environment:
       - PYTHONUNBUFFERED=1
       - DB_PATH=/var/lib/dmarc/dmarc.db
-    # コンテナを維持するための設定
+    command: ["python", "dmarc_analyzer.py"]
     tty: true
     stdin_open: true
-    # 終了後もコンテナを維持
-    command: tail -f /dev/null
 
   grafana:
     image: grafana/grafana
@@ -27,13 +25,18 @@ services:
       - GF_INSTALL_PLUGINS=frser-sqlite-datasource
     volumes:
       - grafana_storage:/var/lib/grafana
-      - dmarc_db:/var/lib/grafana/data:ro
+      - dmarc_data:/var/lib/grafana/data:ro    # 修正: dmarc_db → dmarc_data
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - dmarc_analyzer
 
 networks:
-  dmarc_network: {}
+  dmarc_network:
+    name: dmarc_network
 
 volumes:
-  grafana_storage: {}
-  dmarc_db: {}
+  grafana_storage:
+    name: dmarc_analyzer_grafana_storage
+  dmarc_data:    # 修正: dmarc_db → dmarc_data
+    name: dmarc_analyzer_dmarc_data

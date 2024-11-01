@@ -1,5 +1,6 @@
 # grafana/provisioning/datasources/datasources.yaml
 apiVersion: 1
+
 datasources:
   - name: DMARC Data
     type: frser-sqlite-datasource

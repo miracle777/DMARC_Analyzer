@@ -28,6 +28,71 @@
       },
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": [
+            "レポート数",
+            "総メール数"
+          ],
+          "reducer": [
+            "sum"
+          ],
+          "show": true
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "queryText": "WITH domain_info AS (\r\n    SELECT \r\n        substr(f.from_address, instr(f.from_address, '@') + 1) as domain,\r\n        COUNT(DISTINCT f.source_ip) as unique_ips,\r\n        COUNT(*) as report_count,\r\n        COUNT(DISTINCT a.organization) as org_count,\r\n        SUM(a.count) as total_mails,\r\n        date(min(f.created_at)) as start_date,\r\n        date(max(f.created_at)) as end_date\r\n    FROM dmarc_forensic f\r\n    LEFT JOIN dmarc_aggregate a ON f.source_ip = a.source_ip\r\n    GROUP BY substr(f.from_address, instr(f.from_address, '@') + 1)\r\n)\r\nSELECT \r\n    domain as \"分析対象ドメイン\",\r\n    org_count as \"レポート送信組織数\",\r\n    unique_ips as \"送信元IP数\",\r\n    report_count as \"レポート数\",\r\n    total_mails as \"総メール数\",\r\n    start_date as \"データ開始日\",\r\n    end_date as \"データ最終日\"\r\nFROM domain_info\r\nORDER BY total_mails DESC;",
+          "queryType": "table",
+          "rawQueryText": "WITH domain_info AS (\r\n    SELECT \r\n        substr(f.from_address, instr(f.from_address, '@') + 1) as domain,\r\n        COUNT(DISTINCT f.source_ip) as unique_ips,\r\n        COUNT(*) as report_count,\r\n        COUNT(DISTINCT a.organization) as org_count,\r\n        SUM(a.count) as total_mails,\r\n        date(min(f.created_at)) as start_date,\r\n        date(max(f.created_at)) as end_date\r\n    FROM dmarc_forensic f\r\n    LEFT JOIN dmarc_aggregate a ON f.source_ip = a.source_ip\r\n    GROUP BY substr(f.from_address, instr(f.from_address, '@') + 1)\r\n)\r\nSELECT \r\n    domain as \"分析対象ドメイン\",\r\n    org_count as \"レポート送信組織数\",\r\n    unique_ips as \"送信元IP数\",\r\n    report_count as \"レポート数\",\r\n    total_mails as \"総メール数\",\r\n    start_date as \"データ開始日\",\r\n    end_date as \"データ最終日\"\r\nFROM domain_info\r\nORDER BY total_mails DESC;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "ts"
+          ]
+        }
+      ],
+      "title": "現在の分析対象ドメイン情報",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "P90DAF5EEE766B0A3"
+      },
+      "fieldConfig": {
+        "defaults": {
           "color": {
             "mode": "palette-classic"
           },
@@ -167,7 +232,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 6
       },
       "id": 1,
       "options": {
@@ -224,6 +289,6 @@
   "timezone": "",
   "title": "DMARCレポート概要",
   "uid": "ee2lgvv68smbkb",
-  "version": 10,
+  "version": 15,
   "weekStart": ""
 }
