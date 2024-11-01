@@ -249,7 +249,7 @@ docker-compose restart grafana
 
 #### 新しい環境へのデプロイ時：
 
-# 必要なファイルをコピー
+##### 必要なファイルをコピー
 grafana/
 docker-compose.yaml
 Dockerfile
