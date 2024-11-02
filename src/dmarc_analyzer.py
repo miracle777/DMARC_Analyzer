@@ -1,273 +1,515 @@
 import os
+import sys
+import xml.etree.ElementTree as ET
 import gzip
 import zipfile
-import pandas as pd
-import xmltodict
-import sqlite3
 from datetime import datetime
-import io
+from elasticsearch import Elasticsearch, ConnectionError 
+import time
+import shutil
+from pathlib import Path
+import logging
+from customer_manager import CustomerManager
+from es_setup import setup_elasticsearch_indices
+from analysis_utils import (
+    calculate_authentication_rates,
+    generate_report_stats,
+    check_duplicate_report,
+    batch_save_documents
+)
 
-print("Starting DMARC analysis...")
 
-# パス設定
-DATA_PATH = './files'
-DB_PATH = os.getenv('DB_PATH', '/var/lib/dmarc/dmarc.db')
+# ロギング設定
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-# データベースディレクトリの作成
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-
-def extract_report_date(filename):
-    """ファイル名からレポート期間の開始日を抽出"""
-    try:
-        # ファイル名のフォーマット: domain!start_timestamp!end_timestamp
-        parts = filename.split('!')
-        if len(parts) >= 3:
-            # 開始時刻のタイムスタンプを使用
-            timestamp = parts[-2]  # start_timestamp
-            return datetime.fromtimestamp(int(timestamp)).strftime('%Y-%m-%d %H:%M:%S')
-    except Exception as e:
-        print(f"Error extracting date from filename {filename}: {e}")
-        return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-def extract_file(file_path):
-    """ネストされたZIPファイルからXMLを抽出"""
-    print(f"Processing file: {file_path}")
-    results = []
-    
-    def process_zip_content(zip_content):
-        """ZIPファイルの内容を処理する再帰的な関数"""
-        with zipfile.ZipFile(zip_content) as z:
-            for file_info in z.filelist:
-                with z.open(file_info) as f:
-                    content = f.read()
-                    if file_info.filename.endswith('.xml'):
-                        try:
-                            xml_data = xmltodict.parse(content)
-                            print(f"Successfully parsed XML from {file_info.filename}")
-                            results.append(xml_data)
-                        except Exception as e:
-                            print(f"Error parsing XML from {file_info.filename}: {e}")
-                    elif file_info.filename.endswith('.zip'):
-                        print(f"Found nested ZIP file: {file_info.filename}")
-                        process_zip_content(io.BytesIO(content))
-                    elif file_info.filename.endswith('.gz'):
-                        try:
-                            with gzip.open(io.BytesIO(content)) as gz:
-                                xml_content = gz.read()
-                                xml_data = xmltodict.parse(xml_content)
-                                print(f"Successfully parsed XML from gzipped file {file_info.filename}")
-                                results.append(xml_data)
-                        except Exception as e:
-                            print(f"Error processing gzipped file {file_info.filename}: {e}")
-
-    try:
-        if file_path.endswith('.zip'):
-            with open(file_path, 'rb') as f:
-                process_zip_content(io.BytesIO(f.read()))
-        elif file_path.endswith('.gz'):
-            with gzip.open(file_path, 'rb') as f:
-                content = f.read()
-                results.append(xmltodict.parse(content))
-    except Exception as e:
-        print(f"Error processing file {file_path}: {e}")
-    
-    print(f"Found {len(results)} XML documents in {file_path}")
-    return results
-
-def create_database():
-    """データベーステーブルの作成"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    # 集計レポート用テーブル
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS dmarc_aggregate (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        organization TEXT,
-        report_id TEXT,
-        source_ip TEXT,
-        count INTEGER,
-        spf_result TEXT,
-        dkim_result TEXT,
-        spf_aligned TEXT,
-        dkim_aligned TEXT,
-        dmarc_result TEXT,
-        created_at TIMESTAMP
-    )
-    ''')
-    
-    # 詳細レポート用テーブル
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS dmarc_forensic (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        source_ip TEXT,
-        from_address TEXT,
-        to_address TEXT,
-        spf_result TEXT,
-        dkim_result TEXT,
-        dmarc_result TEXT,
-        created_at TIMESTAMP
-    )
-    ''')
-    
-    conn.commit()
-    conn.close()
-
-def process_report(report, report_date):
-    """DMARCレポートを処理"""
-    try:
-        if 'feedback' not in report:
-            print("Warning: No feedback element in report")
-            print(f"Report structure: {report.keys()}")
-            return [], []
-
-        aggregate_results = []
-        forensic_results = []
+class DMARCAnalyzer:
+    def __init__(self, report_directory, extract_directory, es_url, domain: str):
+        """
+        DMARCアナライザーの初期化
+        Args:
+            report_directory: レポートディレクトリのパス
+            extract_directory: 展開ディレクトリのパス
+            es_url: ElasticsearchのURL
+            domain: 解析対象のドメイン
+        """
+        self.report_directory = report_directory
+        self.extract_directory = extract_directory
+        self.es_url = es_url
+        self.processed_files = set()
         
-        feedback = report['feedback']
-        org_info = feedback.get('report_metadata', {})
-        policy_published = feedback.get('policy_published', {})
+        self.customer_manager = CustomerManager()
+        customer_info = self.customer_manager.get_customer_by_domain(domain)
         
-        records = feedback.get('record', [])
-        if isinstance(records, dict):
-            records = [records]
-        
-        if not records:
-            print("Warning: No records found in report")
-            return [], []
-
-        print(f"Processing {len(records)} records from organization: {org_info.get('org_name', 'unknown')}")
-
-        for record in records:
-            try:
-                row = record.get('row', {})
-                auth_results = record.get('auth_results', {})
-                
-                source_ip = row.get('source_ip', 'unknown')
-                count = int(row.get('count', 0))
-                
-                spf = auth_results.get('spf', {})
-                dkim = auth_results.get('dkim', {})
-                
-                spf_result = (spf[0] if isinstance(spf, list) else spf).get('result', 'none')
-                dkim_result = (dkim[0] if isinstance(dkim, list) else dkim).get('result', 'none')
-                
-                dmarc_result = row.get('policy_evaluated', {}).get('disposition', 'none')
-                
-                aggregate_results.append({
-                    'organization': org_info.get('org_name', 'unknown'),
-                    'report_id': org_info.get('report_id', 'unknown'),
-                    'source_ip': source_ip,
-                    'count': count,
-                    'spf_result': spf_result,
-                    'dkim_result': dkim_result,
-                    'spf_aligned': policy_published.get('aspf', 'none'),
-                    'dkim_aligned': policy_published.get('adkim', 'none'),
-                    'dmarc_result': dmarc_result,
-                    'created_at': report_date
-                })
-                
-                identifiers = record.get('identifiers', {})
-                forensic_results.append({
-                    'source_ip': source_ip,
-                    'from_address': identifiers.get('header_from', 'unknown'),
-                    'to_address': identifiers.get('envelope_to', 'unknown'),
-                    'spf_result': spf_result,
-                    'dkim_result': dkim_result,
-                    'dmarc_result': dmarc_result,
-                    'created_at': report_date
-                })
-                
-            except Exception as e:
-                print(f"Error processing record: {e}")
-                continue
-
-        print(f"Successfully processed {len(aggregate_results)} aggregate records")
-        return aggregate_results, forensic_results
-        
-    except Exception as e:
-        print(f"Error in process_report: {e}")
-        if 'report' in locals():
-            print(f"Report structure: {report.keys()}")
-        return [], []
-
-def save_to_database(aggregate_data, forensic_data):
-    """データをSQLiteに保存"""
-    conn = sqlite3.connect(DB_PATH)
-    
-    try:
-        if not aggregate_data.empty:
-            aggregate_data.to_sql('dmarc_aggregate', conn, if_exists='append', index=False)
-            print(f"Saved {len(aggregate_data)} aggregate records to database")
-        
-        if not forensic_data.empty:
-            forensic_data.to_sql('dmarc_forensic', conn, if_exists='append', index=False)
-            print(f"Saved {len(forensic_data)} forensic records to database")
-    
-    except Exception as e:
-        print(f"Error saving to database: {e}")
-    finally:
-        conn.close()
-
-def parse_reports():
-    aggregate_data = []
-    forensic_data = []
-    
-    print(f"Looking for files in: {DATA_PATH}")
-    if not os.path.exists(DATA_PATH):
-        print(f"Error: Directory {DATA_PATH} does not exist")
-        return pd.DataFrame(), pd.DataFrame()
-    
-    files = [f for f in os.listdir(DATA_PATH) if f.endswith(('.zip', '.gz'))]
-    print(f"Found files: {files}")
-    
-    if not files:
-        print("No .zip or .gz files found")
-        return pd.DataFrame(), pd.DataFrame()
-
-    for file_name in files:
-        try:
-            file_path = os.path.join(DATA_PATH, file_name)
-            print(f"Processing: {file_path}")
-            
-            # ファイル名から日付を抽出
-            report_date = extract_report_date(file_name)
-            print(f"Extracted report date: {report_date}")
-            
-            for report in extract_file(file_path):
-                if report:
-                    agg, err = process_report(report, report_date)
-                    if agg:
-                        aggregate_data.extend(agg)
-                    if err:
-                        forensic_data.extend(err)
-        except Exception as e:
-            print(f"Error processing {file_name}: {e}")
-            continue
-
-    print(f"Processed {len(aggregate_data)} aggregate records and {len(forensic_data)} forensic records")
-    return pd.DataFrame(aggregate_data), pd.DataFrame(forensic_data)
-
-if __name__ == '__main__':
-    try:
-        print("Starting DMARC analysis...")
-        
-        # データベースディレクトリの作成
-        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-        
-        # データベーステーブルの作成
-        create_database()
-        
-        # レポートの解析
-        aggregate_df, forensic_df = parse_reports()
-        
-        if not aggregate_df.empty or not forensic_df.empty:
-            print(f"Saving {len(aggregate_df)} aggregate records and {len(forensic_df)} forensic records to database")
-            save_to_database(aggregate_df, forensic_df)
-            print("Data successfully saved to database")
+        if customer_info is None:
+            self.customer_id = self.customer_manager.register_customer(
+                domain=domain,
+                email=f"admin@{domain}"
+            )
         else:
-            print("No data to save to database")
+            self.customer_id = customer_info['id']
+
+    def process_report_file(self, file_path):
+        if file_path in self.processed_files:
+            logger.info(f"Skipping duplicate file: {file_path}")
+            return
+
+        self.processed_files.add(file_path)
+
+        if file_path.endswith(".xml"):
+            self._process_xml_file(file_path)
+        elif file_path.endswith(".gz"):
+            self._process_gz_file(file_path)
+        elif file_path.endswith(".zip"):
+            self._process_zip_file(file_path)
+        else:
+            logger.warning(f"Unsupported file type: {file_path}")
+
+    def _process_xml_file(self, xml_path):
+        try:
+            logger.info(f"Processing XML file: {xml_path}")
+            tree = ET.parse(xml_path)
+            root = tree.getroot()
+            report_data = self._parse_xml_report(root)
+            self._store_report_data(report_data)
+        except ET.ParseError as e:
+            logger.error(f"Failed to parse XML file {xml_path}: {e}")
+
+    def _parse_xml_report(self, root):
+        report_data = {}
+        return report_data
+
+    def _store_report_data(self, report_data):
+        pass
+        
+        # 設定の初期化
+        self._initialize()
+
+    def analyze_reports(self):
+            """レポートディレクトリ内のXMLファイルを解析"""
+            logger.info(f"Analyzing reports in directory: {self.report_directory}")
+            
+            # レポートディレクトリ内の全ファイルを確認
+            for root, _, files in os.walk(self.report_directory):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    if file.endswith(".xml"):
+                        logger.info(f"Processing XML file: {file_path}")
+                        self.process_xml_file(file_path)
+                    elif file.endswith((".zip", ".gz")):
+                        logger.info(f"Extracting archive file: {file_path}")
+                        extracted_files = self._extract_nested_archives(file_path, self.extract_directory)
+                        for extracted_file in extracted_files:
+                            if extracted_file.endswith(".xml"):
+                                logger.info(f"Processing extracted XML file: {extracted_file}")
+                                self.process_xml_file(extracted_file)
+
+
+    def _initialize(self):
+        """初期化処理"""
+        try:
+            # ディレクトリの作成
+            Path(self.extract_directory).mkdir(parents=True, exist_ok=True)
+            logger.info(f"Extract directory created/confirmed: {self.extract_directory}")
+            
+            # Elasticsearchへの接続
+            self._connect_elasticsearch()
+            
+            # インデックスの設定
+            setup_elasticsearch_indices(self.es)
+            logger.info("Elasticsearch indices setup completed")
+            
+        except Exception as e:
+            logger.error(f"Initialization error: {e}")
+            raise
+
+    def _save_aggregate_report(self, report):
+        """集計レポートの保存（バッチ処理対応）"""
+        try:
+            if 'records' not in report:
+                logger.warning("No records found in aggregate report")
+                return
+
+            # 重複チェック
+            if check_duplicate_report(self.es, report['report_id'], self.customer_id):
+                logger.info(f"Skipping duplicate report: {report['report_id']}")
+                return
+
+            # 基本メタデータの準備
+            base_metadata = {k: v for k, v in report.items() if k != 'records'}
+            base_metadata.update({
+                'customer_id': self.customer_id,
+                'analyzed_at': datetime.now().isoformat()
+            })
+
+            # 認証率の計算
+            auth_rates = calculate_authentication_rates(report['records'])
+            base_metadata.update(auth_rates)
+
+            # ドキュメントの準備
+            documents = []
+            for record in report['records']:
+                document = {**base_metadata, **record}
+                documents.append(document)
+
+            # インデックス名に日付を含める
+            index_name = f"aggregate_reports-{datetime.now():%Y.%m}"
+            
+            # バッチ保存
+            batch_save_documents(self.es, documents, index_name)
+            
+            # 統計情報の生成と保存
+            stats = generate_report_stats(documents, report['policy_published']['domain'])
+            self.es.index(
+                index=f"dmarc_stats-{datetime.now():%Y.%m}",
+                document={
+                    'customer_id': self.customer_id,
+                    'stats': stats,
+                    'timestamp': datetime.now().isoformat()
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error saving aggregate report: {e}")
+
+    def _connect_elasticsearch(self):
+        """Elasticsearchへの接続を確立"""
+        retries = 5
+        for i in range(retries):
+            try:
+                self.es = Elasticsearch([self.es_url])
+                if self.es.ping():
+                    logger.info("Successfully connected to Elasticsearch")
+                    break
+            except ConnectionError:
+                logger.warning(f"Connection attempt {i+1} failed, retrying...")
+                time.sleep(10)
+            except Exception as e:
+                logger.error(f"Unexpected error: {e}")
+                time.sleep(10)
+
+        if not hasattr(self, 'es') or not self.es.ping():
+            raise ConnectionError("Failed to connect to Elasticsearch")
+
+    def _extract_nested_archives(self, file_path, extract_dir):
+        """再帰的にアーカイブを展開"""
+        logger.debug(f"アーカイブの展開開始: {file_path}")
+        
+        try:
+            # 一時ディレクトリの作成（ユニークな名前）
+            temp_dir = os.path.join(
+                extract_dir, 
+                f"temp_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
+            )
+            os.makedirs(temp_dir, exist_ok=True)
+            logger.debug(f"一時ディレクトリを作成: {temp_dir}")
+
+            extracted_files = []
+
+            try:
+                if zipfile.is_zipfile(file_path):
+                    logger.debug(f"ZIPファイルの処理: {file_path}")
+                    with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                        # ファイル名の文字エンコーディング対策
+                        for file_info in zip_ref.filelist:
+                            try:
+                                file_name = file_info.filename
+                                extracted_path = os.path.join(temp_dir, os.path.basename(file_name))
+                                
+                                # 個別にファイルを展開
+                                with zip_ref.open(file_info) as source, \
+                                    open(extracted_path, 'wb') as target:
+                                    shutil.copyfileobj(source, target)
+
+                                if file_name.lower().endswith(('.zip', '.gz')):
+                                    # 再帰的に処理
+                                    nested_files = self._extract_nested_archives(extracted_path, extract_dir)
+                                    extracted_files.extend(nested_files)
+                                    os.remove(extracted_path)  # 中間ファイルを削除
+                                elif file_name.lower().endswith('.xml'):
+                                    final_path = os.path.join(extract_dir, 
+                                        f"{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}_{os.path.basename(file_name)}")
+                                    shutil.move(extracted_path, final_path)
+                                    extracted_files.append(final_path)
+                            except Exception as e:
+                                logger.error(f"ZIPファイル内のファイル処理エラー {file_name}: {e}")
+
+                elif file_path.endswith('.gz'):
+                    logger.debug(f"GZファイルの処理: {file_path}")
+                    output_path = os.path.join(temp_dir, 
+                        f"{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}_{os.path.basename(file_path)[:-3]}")
+                    
+                    with gzip.open(file_path, 'rb') as f_in:
+                        with open(output_path, 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+
+                    if output_path.lower().endswith('.zip'):
+                        nested_files = self._extract_nested_archives(output_path, extract_dir)
+                        extracted_files.extend(nested_files)
+                        os.remove(output_path)  # 中間ファイルを削除
+                    elif output_path.lower().endswith('.xml'):
+                        final_path = os.path.join(extract_dir, os.path.basename(output_path))
+                        shutil.move(output_path, final_path)
+                        extracted_files.append(final_path)
+
+                return extracted_files
+
+            finally:
+                # 一時ディレクトリの削除
+                if os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    logger.debug(f"一時ディレクトリを削除: {temp_dir}")
+
+        except Exception as e:
+            logger.error(f"アーカイブ展開エラー {file_path}: {e}")
+            return []
+
     
-    except Exception as e:
-        print(f"Error in main execution: {e}")
-        raise
+
+    def _parse_aggregate_report(self, root):
+        """集計レポートのパース"""
+        try:
+            report_metadata = root.find('report_metadata')
+            if report_metadata is None:
+                logger.warning("No report_metadata found in XML")
+                return None
+
+            policy_published = root.find('policy_published')
+            if policy_published is None:
+                logger.warning("No policy_published found in XML")
+                return None
+
+            # 基本データの取得
+            parsed_data = {
+                "org_name": report_metadata.findtext('org_name', 'unknown'),
+                "report_id": report_metadata.findtext('report_id', 'unknown'),
+                "report_date": None,
+                "date_range": {
+                    "begin": None,
+                    "end": None
+                },
+                "policy_published": {
+                    "domain": policy_published.findtext('domain', 'unknown'),
+                    "adkim": policy_published.findtext('adkim', 'unknown'),
+                    "aspf": policy_published.findtext('aspf', 'unknown'),
+                    "p": policy_published.findtext('p', 'unknown'),
+                    "sp": policy_published.findtext('sp', 'unknown'),
+                    "pct": policy_published.findtext('pct', 'unknown')
+                },
+                "records": []
+            }
+
+            # タイムスタンプの処理
+            date_range = report_metadata.find('date_range')
+            if date_range is not None:
+                begin = date_range.findtext('begin')
+                end = date_range.findtext('end')
+                if begin:
+                    begin_date = datetime.fromtimestamp(int(begin))
+                    parsed_data['date_range']['begin'] = begin_date.isoformat()
+                    parsed_data['report_date'] = begin_date.date().isoformat()
+                if end:
+                    parsed_data['date_range']['end'] = datetime.fromtimestamp(int(end)).isoformat()
+
+            # レコードの処理
+            for record in root.findall('record'):
+                row = record.find('row')
+                identifiers = record.find('identifiers')
+                auth_results = record.find('auth_results')
+                
+                if row is not None:
+                    record_data = {
+                        "source_ip": row.findtext('source_ip', 'unknown'),
+                        "count": int(row.findtext('count', '0')),
+                        "policy_evaluated": {},
+                        "auth_results": {},
+                        "header_from": "unknown"
+                    }
+
+                    # Policy Evaluated
+                    policy_evaluated = row.find('policy_evaluated')
+                    if policy_evaluated is not None:
+                        record_data["policy_evaluated"] = {
+                            "disposition": policy_evaluated.findtext('disposition', 'none'),
+                            "dkim": policy_evaluated.findtext('dkim', 'none'),
+                            "spf": policy_evaluated.findtext('spf', 'none')
+                        }
+
+                    # Auth Results
+                    if auth_results is not None:
+                        record_data["auth_results"] = {
+                            "dkim": auth_results.findtext('.//dkim/result', 'none'),
+                            "spf": auth_results.findtext('.//spf/result', 'none')
+                        }
+
+                    # Header From
+                    if identifiers is not None:
+                        record_data["header_from"] = identifiers.findtext('header_from', 'unknown')
+
+                    parsed_data["records"].append(record_data)
+
+            logger.debug(f"Parsed aggregate report data: {parsed_data}")
+            return parsed_data
+
+        except Exception as e:
+            logger.error(f"Error parsing aggregate report: {e}")
+            return None
+
+    def _parse_forensic_report(self, root):
+        """フォレンジックレポートのパース"""
+        try:
+            parsed_data = {
+                "arrival_date": None,
+                "report_id": root.findtext('report-id', 'unknown'),
+                "original_mail_date": None,
+                "source_ip": root.findtext('source-ip', 'unknown'),
+                "auth_results": {
+                    "dkim": "none",
+                    "spf": "none",
+                    "dmarc": "none"
+                },
+                "envelope_to": root.findtext('envelope-to', 'unknown'),
+                "envelope_from": root.findtext('envelope-from', 'unknown'),
+                "header_from": root.findtext('header-from', 'unknown'),
+                "reported_domain": root.findtext('reported-domain', 'unknown')
+            }
+
+            # 日付の処理
+            arrival_date = root.findtext('arrival-date')
+            if arrival_date:
+                try:
+                    parsed_data['arrival_date'] = datetime.strptime(arrival_date, 
+                        '%Y-%m-%d %H:%M:%S%z').isoformat()
+                except ValueError:
+                    try:
+                        parsed_data['arrival_date'] = datetime.strptime(arrival_date, 
+                            '%Y-%m-%d %H:%M:%S').isoformat()
+                    except ValueError as e:
+                        logger.warning(f"Could not parse arrival date: {e}")
+
+            # 元のメールの日付
+            original_date = root.findtext('original-mail-date')
+            if original_date:
+                try:
+                    parsed_data['original_mail_date'] = datetime.strptime(original_date, 
+                        '%Y-%m-%d %H:%M:%S%z').isoformat()
+                except ValueError:
+                    try:
+                        parsed_data['original_mail_date'] = datetime.strptime(original_date, 
+                            '%Y-%m-%d %H:%M:%S').isoformat()
+                    except ValueError as e:
+                        logger.warning(f"Could not parse original mail date: {e}")
+
+            # 認証結果の処理
+            auth_results = root.find('auth-results')
+            if auth_results is not None:
+                parsed_data['auth_results'] = {
+                    'dkim': auth_results.findtext('dkim', 'none'),
+                    'spf': auth_results.findtext('spf', 'none'),
+                    'dmarc': auth_results.findtext('dmarc', 'none')
+                }
+
+            logger.debug(f"Parsed forensic report data: {parsed_data}")
+            return parsed_data
+
+        except Exception as e:
+            logger.error(f"Error parsing forensic report: {e}")
+            return None
+
+    def _save_aggregate_report(self, report):
+        """集計レポートの保存（バッチ処理対応）"""
+        try:
+            if 'records' not in report:
+                logger.warning("No records found in aggregate report")
+                return
+
+            # 重複チェック
+            if check_duplicate_report(self.es, report['report_id'], self.customer_id):
+                logger.info(f"Skipping duplicate report: {report['report_id']}")
+                return
+
+            # 基本メタデータの準備
+            base_metadata = {k: v for k, v in report.items() if k != 'records'}
+            base_metadata.update({
+                'customer_id': self.customer_id,
+                'analyzed_at': datetime.now().isoformat()
+            })
+
+            # インデックス名に日付を含める
+            index_name = f"aggregate_reports-{datetime.now():%Y.%m}"
+
+            # ドキュメントの準備
+            documents = []
+            for record in report['records']:
+                document = {**base_metadata, **record}
+                documents.append(document)
+
+            # バッチ保存
+            batch_save_documents(self.es, documents, index_name)
+
+        except Exception as e:
+            logger.error(f"Error saving aggregate report: {e}")
+
+    def _save_forensic_report(self, report):
+        """フォレンジックレポートの保存"""
+        try:
+            response = self.es.index(index='forensic_reports', document=report)
+            logger.info(f"Saved forensic report: {response['result']}")
+        except Exception as e:
+            logger.error(f"Error saving forensic report: {e}")
+
+
+    def process_xml_file(self, xml_file_path: str) -> None:
+        """XMLファイルを直接処理してElasticsearchに保存"""
+        logger.info(f"XMLファイルの処理開始: {xml_file_path}")
+        
+        try:
+            # インデックスの存在確認と作成
+            current_month = datetime.now().strftime("%Y.%m")
+            aggregate_index = f"aggregate_reports-{current_month}"
+            forensic_index = f"forensic_reports-{current_month}"
+
+            if not self.es.indices.exists(index=aggregate_index):
+                setup_elasticsearch_indices(self.es)
+                logger.info("Created required indices")
+
+            # XMLファイルのパース
+            tree = ET.parse(xml_file_path)
+            root = tree.getroot()
+            
+            # レポートタイプの判定とパース
+            if root.tag == 'feedback':
+                report_data = self._parse_aggregate_report(root)
+                if report_data:
+                    self._save_aggregate_report(report_data)
+                    logger.info(f"集計レポートを保存しました: {xml_file_path}")
+                else:
+                    logger.warning(f"集計レポートのパースに失敗: {xml_file_path}")
+            else:
+                logger.warning(f"未対応のXMLフォーマット: {xml_file_path}")
+                
+        except ET.ParseError as e:
+            logger.error(f"XMLパースエラー {xml_file_path}: {e}")
+        except Exception as e:
+            logger.error(f"予期せぬエラー {xml_file_path}: {e}")
+
+
+
+
+if __name__ == "__main__":
+    # 環境変数からドメインを取得
+    domain = os.getenv("DOMAIN")
+    if not domain:
+        print("Error: DOMAIN environment variable is not set. Exiting.")
+        sys.exit(1)
+        
+    analyzer = DMARCAnalyzer(
+        report_directory="/app/files", 
+        extract_directory="/app/files/extracted",
+        es_url="http://elasticsearch:9200",
+        domain=domain
+    )
+    analyzer.analyze_reports()

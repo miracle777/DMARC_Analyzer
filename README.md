@@ -1,19 +1,21 @@
-
 # DMARCレポート解析ツール
 
-
 ## 概要
-このツールは、メールサーバーから受信したDMARCレポートを解析し、視覚化するシステムです。ZIPまたはGZIP形式で圧縮されたXMLレポートを処理し、SQLiteデータベースに保存、Grafanaを使用してダッシュボード形式で表示します。
+
+  このツールは、メールサーバーから受信したDMARCレポートを解析し、視覚化するシステムです。XML形式のファイルまたは、ZIPまたはGZIP形式で圧縮されたXMLレポートを処理し、Elasticsearchに保存、Grafanaを使用してダッシュボード形式で表示します。
 
 主な機能：
-  - DMARCレポート（ZIP/GZIP）の自動解析
+
+  - DMARCレポート（ZIP/GZIP/XML）の自動解析
   - ネストされたZIPファイルの処理対応
   - SPF/DKIM認証結果の分析
   - 組織別のメール統計情報
   - 時系列での認証状況の可視化
+  - ファイルの重複読み込みが無いように対策しました。
 
 
 ## システム要件
+
   - Docker
   - Docker Compose
   - 約2GB以上の空きディスク容量
@@ -38,114 +40,164 @@ docker-compose build
 docker-compose up -d
 ```
 
+起動する際に、セキュリティの意味も込めて、解析するドメインを指定します。
+```bash
+DOMAIN=example.com docker-compose up --build
+```
+PowerShellでdocker-composeを実行する場合、環境変数の指定方法が異なります。PowerShellでは、$env:を使って環境変数を設定し、その後にコマンドを実行する必要があります。
+```bash
+$env:DOMAIN = "example.com"
+docker-compose up --build
+```
+
 
 ## 使用方法
 
+filesのフォルダsの中に、DMARCのレポートをZipまたはGz形式の圧縮ファイルのままセットしてください。
 
-### DMARCレポートの処理
+### コマンドラインインターフェース
 
-1. レポートファイルの配置：
-  - `files`ディレクトリにDMARCレポートファイル（.zip/.gz）を配置
+DMARCレポートの解析は、以下のコマンドラインオプションを使用して実行できます：
 
-2. データの更新：
+1. 特定のドメインのレポート解析：
 ```bash
+python src/dmarc_analyzer_cli.py --domain example.com
+```
 
-# コンテナの再起動でレポートを処理
-docker-compose restart dmarc_analyzer
+2. 登録済み顧客の一覧表示：
+```bash
+python src/dmarc_analyzer_cli.py --list-customers
+```
 
+3. すべての登録済み顧客のレポートを一括処理：
+```bash
+python src/dmarc_analyzer_cli.py --all-customers
+```
 
-# ログの確認
-docker-compose logs -f dmarc_analyzer
+4. カスタムディレクトリの指定：
+```bash
+python src/dmarc_analyzer_cli.py --domain example.com \
+  --report-dir /custom/reports \
+  --extract-dir /custom/extracted
+```
+
+5.XMLファイルの直接処理:
+```bash
+python dmarc_analyzer_cli.py --xml-file /path/to/dmarc_report.xml
+```
+
+6.ドメインとXMLファイルの両方を指定:
+```bash
+python dmarc_analyzer_cli.py --domain example.com --xml-file /path/to/dmarc_report.xml
 ```
 
 
-### Grafanaダッシュボードへのアクセス
+### 顧客管理
 
-1. ブラウザで以下のURLにアクセス：
-  - http://localhost:3000
-  - 初期ログイン情報：
-  - ユーザー名: admin
-  - パスワード: admin
+各ドメインのDMARCレポートは、顧客IDによって管理されます。
 
-2. ダッシュボードの表示：
-  - 左メニュー → Dashboards → DMARCレポート概要
+1. 新規顧客の自動登録：
+- 初めてドメインを指定して解析を実行すると、自動的に顧客として登録されます
+- 顧客IDは`CUST_{ドメイン名}_{ハッシュ}`の形式で生成されます
+- 例：`CUST_example_com_a1b2c3d4`
 
-
-### データの更新と保守
-
-1. 新しいレポートの追加：
+2. 顧客情報の確認：
 ```bash
-
-# 新しいレポートをfilesディレクトリに配置
-
-# コンテナを再起動
-docker-compose restart dmarc_analyzer
+python src/dmarc_analyzer_cli.py --list-customers
+```
+出力例：
+```
+登録済み顧客一覧:
+--------------------------------------------------------------------------------
+顧客ID                          ドメイン            組織名              状態
+--------------------------------------------------------------------------------
+CUST_example_com_a1b2c3d4     example.com        Example Corp        有効
+CUST_sample_org_b2c3d4e5      sample.org         Sample Org         有効
+--------------------------------------------------------------------------------
 ```
 
-2. システムの完全リセット：
-```bash
-
-# すべてを停止してクリーンアップ
-docker-compose down
-
-
-# 再ビルドして起動
-docker-compose build --no-cache
-docker-compose up -d
-```
-
-
-### トラブルシューティング
-
-1. データベース接続エラーの場合：
-```bash
-docker-compose exec dmarc_analyzer bash
-sqlite3 /var/lib/dmarc/dmarc.db
-.tables
-```
-
-2. ログの確認：
-```bash
-docker-compose logs -f dmarc_analyzer
-```
-
-3. Grafanaの再起動：
-```bash
-docker-compose restart grafana
-```
 
 
 ### 異なるドメインのデータを分析する場合
 
+以下の手順で、異なるドメインのデータを個別に分析できます：
 
-
-#### 1. 既存のコンテナを停止
+1. 既存のコンテナを停止：
+```bash
 docker-compose down
+```
+
+2. レポートディレクトリの準備：
+```bash
+# PowerShellの場合
+Remove-Item .\reports\* -Force
+
+# Linuxの場合
+rm -rf ./reports/*
+```
+
+3. 新しいドメインのレポートを配置：
+注意：DMARCレポートファイルは必ず `files` ディレクトリに配置してください。これは、Dockerコンテナがこのディレクトリをマウントして処理を行うように設定されているためです。
+
+### ディレクトリ構造：
+```
+DMARC_Analyzer/
+├── files/          # DMARCレポートを配置するディレクトリ
+├── src/            # ソースコード
+│   ├── dmarc_analyzer.py
+│   └── ...
+└── ...
+
+4. 解析の実行：
+```bash
+# PowerShellの場合
+.\reset-analysis.ps1 --domain new-example.com
+
+# Linuxの場合
+./reset-analysis.sh --domain new-example.com
+```
+
+### Elasticsearchのデータ構造
+
+データは以下の形式でElasticsearchに保存されます：
+
+1. aggregate_reports-YYYY.MM インデックス：
+- 集計レポートのデータ
+- 月単位でインデックスを分割
+- customer_idによるデータの分離
+
+2. dmarc_stats-YYYY.MM インデックス：
+- 統計情報
+- 認証成功率などの集計データ
+- 顧客ごとの月次サマリー
 
 
-#### 2. filesディレクトリの中身をクリア
-Remove-Item .\files\* -Force
 
+### 統計情報の確認
 
-#### 3. 新しいファイルを配置
-Copy-Item "新しいDMARCレポート.zip" .\files\
+各ドメインの統計情報は以下のように確認できます：
 
+1. 認証成功率：
+- DKIM/SPF認証の成功率
+- 時系列での推移
+- 送信元IPごとの分析
 
-#### 4. リセットスクリプトを実行
-.\reset-analysis.sh
-
-#### PowerShellで実行する場合
-.\reset-analysis.ps1
-
-##### または個別のコマンドで実行
-docker-compose down -v
-docker-compose build --no-cache
-docker-compose up -d
-docker-compose logs -f dmarc_analyzer
-
+2. メール統計：
+- 総メール数
+- 認証方式ごとの成功/失敗数
+- エラーの種類と頻度
 
 
 ## Grafanaダッシュボードの管理
+
+Grafanaダッシュボードへのアクセス
+ブラウザで以下のURLにアクセス：
+http://localhost:3000
+初期ログイン情報：
+ユーザー名: admin
+パスワード: admin
+ダッシュボードの表示：
+左メニュー → Dashboards → DMARCレポート概要
 
 
 ### ダッシュボード構成
@@ -170,6 +222,8 @@ docker-compose logs -f dmarc_analyzer
   - 日次の認証結果推移
   - 組織別の認証成功率トレンド
   - 週次/月次のサマリー
+
+上記は、実装予定も含みます。
 
 
 ### ダッシュボードの更新手順

@@ -1,10 +1,15 @@
-# grafana/provisioning/datasources/datasources.yaml
 apiVersion: 1
 
 datasources:
-  - name: DMARC Data
-    type: frser-sqlite-datasource
+  - name: Elasticsearch
+    type: elasticsearch
     access: proxy
+    url: http://elasticsearch:9200
     isDefault: true
+    database: "aggregate_reports"
     jsonData:
-      path: /var/lib/grafana/data/dmarc.db
+      esVersion: "7.17.0"
+      timeField: "report_date"
+      interval: "Daily"
+    version: 1
+    editable: true

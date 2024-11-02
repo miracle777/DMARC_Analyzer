@@ -1,0 +1,21 @@
+# docker/Dockerfile.analyzer
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# システムパッケージのインストール
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# 必要なディレクトリの作成
+RUN mkdir -p /app/files/extracted /app/reports /app/src
+
+# Python依存関係のインストール
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 実行コマンドを変更
+CMD ["python", "src/dmarc_analyzer.py"]

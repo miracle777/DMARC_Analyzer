@@ -1,42 +1,64 @@
 services:
+  elasticsearch:
+      image: docker.elastic.co/elasticsearch/elasticsearch:7.17.14
+      environment:
+        - discovery.type=single-node
+        - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+        - xpack.security.enabled=false
+      volumes:
+        - es_data:/usr/share/elasticsearch/data
+      ports:
+        - "9200:9200"
+      networks:
+        - dmarc_network
+      healthcheck:
+        test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"'"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+
+
   dmarc_analyzer:
-    build: .
+    build:
+      context: .
+      dockerfile: Docker/Dockerfile
     volumes:
       - ./files:/app/files
-      - dmarc_data:/var/lib/dmarc    # 修正: dmarc_db → dmarc_data
+      - ./reports:/app/reports
+      - ./src:/app/src
+    environment:
+      - ELASTICSEARCH_HOST=elasticsearch
+      - ELASTICSEARCH_PORT=9200
+      - PYTHONUNBUFFERED=1
+      - DOMAIN=${DOMAIN}  # DOMAIN環境変数を指定（デフォルト値はなし）
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
     networks:
       - dmarc_network
-    environment:
-      - PYTHONUNBUFFERED=1
-      - DB_PATH=/var/lib/dmarc/dmarc.db
-    command: ["python", "dmarc_analyzer.py"]
     tty: true
-    stdin_open: true
 
   grafana:
-    image: grafana/grafana
-    ports:
-      - "3000:3000"
-    networks:
-      - dmarc_network
+    image: grafana/grafana:latest
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_SECURITY_ADMIN_USER=admin
-      - GF_INSTALL_PLUGINS=frser-sqlite-datasource
+    ports:
+      - "3000:3000"
     volumes:
-      - grafana_storage:/var/lib/grafana
-      - dmarc_data:/var/lib/grafana/data:ro    # 修正: dmarc_db → dmarc_data
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/etc/grafana/dashboards
+      - grafana_data:/var/lib/grafana
     depends_on:
-      - dmarc_analyzer
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - dmarc_network
 
 networks:
   dmarc_network:
-    name: dmarc_network
+    driver: bridge
 
 volumes:
-  grafana_storage:
-    name: dmarc_analyzer_grafana_storage
-  dmarc_data:    # 修正: dmarc_db → dmarc_data
-    name: dmarc_analyzer_dmarc_data
+  es_data:
+  grafana_data:

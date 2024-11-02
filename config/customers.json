@@ -1,0 +1,10 @@
+{
+  "CUST_example_com_a379a6f6": {
+    "domain": "example.com",
+    "email": "admin@example.com",
+    "organization": "Organization of example.com",
+    "registered_at": "2024-11-02T04:34:34.673275",
+    "last_updated": "2024-11-02T04:34:34.673349",
+    "active": true
+  }
+}
