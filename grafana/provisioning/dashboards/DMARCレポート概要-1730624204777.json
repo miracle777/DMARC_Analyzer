@@ -967,8 +967,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1149,13 +1148,13 @@
           "text": "All",
           "value": "$__all"
         },
-        "definition": "{\"find\": \"terms\", \"field\": \"policy_published.domain\", \"size\": 100}",
+        "definition": "{\"find\": \"terms\", \"field\": \"policy_published.domain\", \"size\": 100}\n",
         "includeAll": true,
         "label": "domain",
         "multi": true,
         "name": "domain",
         "options": [],
-        "query": "{\"find\": \"terms\", \"field\": \"policy_published.domain\", \"size\": 100}",
+        "query": "{\"find\": \"terms\", \"field\": \"policy_published.domain\", \"size\": 100}\n",
         "refresh": 1,
         "regex": "",
         "type": "query"

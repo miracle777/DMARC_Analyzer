@@ -40,15 +40,7 @@ docker-compose build
 docker-compose up -d
 ```
 
-起動する際に、セキュリティの意味も込めて、解析するドメインを指定します。
-```bash
-DOMAIN=example.com docker-compose up --build
-```
-PowerShellでdocker-composeを実行する場合、環境変数の指定方法が異なります。PowerShellでは、$env:を使って環境変数を設定し、その後にコマンドを実行する必要があります。
-```bash
-$env:DOMAIN = "example.com"
-docker-compose up --build
-```
+
 
 
 ## 使用方法
@@ -255,25 +247,6 @@ http://localhost:3000
 ### ダッシュボードの説明
 
 #### 概要ダッシュボード（dmarc_summary_dashboard.json）
-  - 目的：DMARCレポートの全体像を把握
-  - 主要パネル：
-  - 分析対象ドメイン情報
-  - SPF/DKIM認証結果の分布
-  - 組織別メール数と認証結果
-
-#### 単日分析ダッシュボード（dmarc_daily_analysis.json）
-  - 目的：特定日の詳細な認証結果分析
-  - 主要パネル：
-  - 時間帯別認証結果グラフ
-  - エラー詳細テーブル
-  - 送信元IP分析
-
-#### トレンド分析ダッシュボード（dmarc_trend_analysis.json）
-  - 目的：長期的な認証結果の傾向分析
-  - 主要パネル：
-  - 日次認証結果推移
-  - 組織別サマリー
-  - 週次トレンドグラフ
 
 
 ### 注意事項

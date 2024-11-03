@@ -5,6 +5,33 @@ from pathlib import Path
 from typing import Optional
 from dmarc_analyzer import DMARCAnalyzer
 from customer_manager import CustomerManager
+from elasticsearch import Elasticsearch
+
+def get_domain_from_policy():
+    # Elasticsearchクライアントを初期化
+    es = Elasticsearch("http://localhost:9200")  # ElasticsearchのURLは適宜設定してください
+
+    # クエリを実行して `policy_published.domain` フィールドを取得
+    response = es.search(
+        index="aggregate_reports-*",
+        body={
+            "size": 1,
+            "_source": ["policy_published.domain"],
+            "query": {
+                "match_all": {}
+            }
+        }
+    )
+
+    # 結果からドメイン名を取得
+    hits = response.get('hits', {}).get('hits', [])
+    if hits:
+        domain = hits[0].get('_source', {}).get('policy_published', {}).get('domain', "default.com")
+    else:
+        domain = "default.com"  # デフォルトのドメイン名（見つからない場合）
+
+    return domain
+
 
 # ロギング設定
 logging.basicConfig(

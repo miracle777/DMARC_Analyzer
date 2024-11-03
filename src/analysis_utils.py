@@ -2,6 +2,33 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any
 import logging
 from elasticsearch import helpers 
+from elasticsearch import Elasticsearch
+
+def get_domain_from_policy():
+    # Initialize Elasticsearch client
+    es = Elasticsearch("http://localhost:9200")  # Adjust this URL if necessary
+
+    # Perform search to get the `policy_published.domain` field
+    response = es.search(
+        index="aggregate_reports-*",
+        body={
+            "size": 1,
+            "_source": ["policy_published.domain"],
+            "query": {
+                "match_all": {}
+            }
+        }
+    )
+
+    # Extract domain from response
+    hits = response.get('hits', {}).get('hits', [])
+    if hits:
+        domain = hits[0].get('_source', {}).get('policy_published', {}).get('domain', "default.com")
+    else:
+        domain = "default.com"  # Default domain if not found
+
+    return domain
+
 
 logger = logging.getLogger(__name__)
 

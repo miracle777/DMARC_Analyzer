@@ -1,15 +1,19 @@
+
 apiVersion: 1
 
 datasources:
-  - name: Elasticsearch
+  - name: Aggregate Reports
     type: elasticsearch
     access: proxy
     url: http://elasticsearch:9200
-    isDefault: true
-    database: "aggregate_reports"
+    database: "aggregate_reports-*"
     jsonData:
-      esVersion: "7.17.0"
       timeField: "report_date"
-      interval: "Daily"
-    version: 1
-    editable: true
+
+  - name: Forensic Reports
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    database: "forensic_reports-*"
+    jsonData:
+      timeField: "report_date"

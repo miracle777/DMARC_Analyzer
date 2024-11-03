@@ -1,64 +1,65 @@
+networks:
+  dmarc_network:
+    driver: bridge
+    
 services:
-  elasticsearch:
-      image: docker.elastic.co/elasticsearch/elasticsearch:7.17.14
-      environment:
-        - discovery.type=single-node
-        - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-        - xpack.security.enabled=false
-      volumes:
-        - es_data:/usr/share/elasticsearch/data
-      ports:
-        - "9200:9200"
-      networks:
-        - dmarc_network
-      healthcheck:
-        test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"'"]
-        interval: 30s
-        timeout: 10s
-        retries: 5
-
-
   dmarc_analyzer:
     build:
       context: .
       dockerfile: Docker/Dockerfile
-    volumes:
-      - ./files:/app/files
-      - ./reports:/app/reports
-      - ./src:/app/src
-    environment:
-      - ELASTICSEARCH_HOST=elasticsearch
-      - ELASTICSEARCH_PORT=9200
-      - PYTHONUNBUFFERED=1
-      - DOMAIN=${DOMAIN}  # DOMAIN環境変数を指定（デフォルト値はなし）
     depends_on:
       elasticsearch:
         condition: service_healthy
+    environment:
+    - ELASTICSEARCH_HOST=elasticsearch
+    - ELASTICSEARCH_PORT=9200
+    - PYTHONUNBUFFERED=1
+    - DOMAIN=${DOMAIN}
     networks:
-      - dmarc_network
+    - dmarc_network
     tty: true
-
-  grafana:
-    image: grafana/grafana:latest
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_SECURITY_ADMIN_USER=admin
-    ports:
-      - "3000:3000"
     volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning
-      - ./grafana/dashboards:/etc/grafana/dashboards
-      - grafana_data:/var/lib/grafana
+    - ./files:/app/files
+    - ./reports:/app/reports
+    - ./src:/app/src
+
+  elasticsearch:
+    environment:
+    - discovery.type=single-node
+    - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    - xpack.security.enabled=false
+    healthcheck:
+      interval: 30s
+      retries: 5
+      test:
+      - CMD-SHELL
+      - curl -s http://localhost:9200/_cluster/health | grep -q '"status":"green"'
+      timeout: 10s
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.14
+    networks:
+    - dmarc_network
+    ports:
+    - 9200:9200
+    volumes:
+    - es_data:/usr/share/elasticsearch/data
+    
+  grafana:
     depends_on:
       elasticsearch:
         condition: service_healthy
+    environment:
+    - GF_SECURITY_ADMIN_PASSWORD=admin
+    - GF_SECURITY_ADMIN_USER=admin
+    image: grafana/grafana:latest
     networks:
-      - dmarc_network
-
-networks:
-  dmarc_network:
-    driver: bridge
-
+    - dmarc_network
+    ports:
+    - 3000:3000
+    volumes:
+    - ./grafana/provisioning:/etc/grafana/provisioning
+    - ./grafana/dashboards:/etc/grafana/dashboards
+    - grafana_data:/var/lib/grafana
+    - ./datasources_updated.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
 volumes:
-  es_data:
-  grafana_data:
+  es_data: null
+  grafana_data: null
