@@ -191,12 +191,19 @@ DMARC_Analyzer/
 ## Grafanaダッシュボードの管理
 
 Grafanaダッシュボードへのアクセス
+
 ブラウザで以下のURLにアクセス：
+
 http://localhost:3000
+
 初期ログイン情報：
+
 ユーザー名: admin
+
 パスワード: admin
+
 ダッシュボードの表示：
+
 左メニュー → Dashboards → DMARCレポート概要
 
 

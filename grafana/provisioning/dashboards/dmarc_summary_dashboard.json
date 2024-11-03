@@ -23,17 +23,13 @@
   "panels": [
     {
       "datasource": {
-        "type": "frser-sqlite-datasource",
-        "uid": "P90DAF5EEE766B0A3"
+        "type": "elasticsearch",
+        "uid": "P31C819B24CF3C3C7"
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
+          "color": {
+            "mode": "thresholds"
           },
           "mappings": [],
           "thresholds": {
@@ -44,35 +40,55 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "none"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 6,
-        "w": 24,
+        "h": 8,
+        "w": 7,
         "x": 0,
         "y": 0
       },
       "id": 2,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": [
-            "レポート数",
-            "総メール数"
-          ],
-          "reducer": [
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
             "sum"
           ],
-          "show": true
+          "fields": "/^Sum count$/",
+          "values": false
         },
-        "showHeader": true
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
       },
       "pluginVersion": "11.3.0",
       "targets": [
         {
+          "alias": "",
+          "bucketAggs": [
+            {
+              "field": "report_date",
+              "id": "2",
+              "settings": {
+                "interval": "1d"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "metrics": [
+            {
+              "field": "count",
+              "id": "1",
+              "type": "sum"
+            }
+          ],
+          "query": "",
           "queryText": "WITH domain_info AS (\r\n    SELECT \r\n        substr(f.from_address, instr(f.from_address, '@') + 1) as domain,\r\n        COUNT(DISTINCT f.source_ip) as unique_ips,\r\n        COUNT(*) as report_count,\r\n        COUNT(DISTINCT a.organization) as org_count,\r\n        SUM(a.count) as total_mails,\r\n        date(min(f.created_at)) as start_date,\r\n        date(max(f.created_at)) as end_date\r\n    FROM dmarc_forensic f\r\n    LEFT JOIN dmarc_aggregate a ON f.source_ip = a.source_ip\r\n    GROUP BY substr(f.from_address, instr(f.from_address, '@') + 1)\r\n)\r\nSELECT \r\n    domain as \"分析対象ドメイン\",\r\n    org_count as \"レポート送信組織数\",\r\n    unique_ips as \"送信元IP数\",\r\n    report_count as \"レポート数\",\r\n    total_mails as \"総メール数\",\r\n    start_date as \"データ開始日\",\r\n    end_date as \"データ最終日\"\r\nFROM domain_info\r\nORDER BY total_mails DESC;",
           "queryType": "table",
           "rawQueryText": "WITH domain_info AS (\r\n    SELECT \r\n        substr(f.from_address, instr(f.from_address, '@') + 1) as domain,\r\n        COUNT(DISTINCT f.source_ip) as unique_ips,\r\n        COUNT(*) as report_count,\r\n        COUNT(DISTINCT a.organization) as org_count,\r\n        SUM(a.count) as total_mails,\r\n        date(min(f.created_at)) as start_date,\r\n        date(max(f.created_at)) as end_date\r\n    FROM dmarc_forensic f\r\n    LEFT JOIN dmarc_aggregate a ON f.source_ip = a.source_ip\r\n    GROUP BY substr(f.from_address, instr(f.from_address, '@') + 1)\r\n)\r\nSELECT \r\n    domain as \"分析対象ドメイン\",\r\n    org_count as \"レポート送信組織数\",\r\n    unique_ips as \"送信元IP数\",\r\n    report_count as \"レポート数\",\r\n    total_mails as \"総メール数\",\r\n    start_date as \"データ開始日\",\r\n    end_date as \"データ最終日\"\r\nFROM domain_info\r\nORDER BY total_mails DESC;",
@@ -80,50 +96,363 @@
           "timeColumns": [
             "time",
             "ts"
-          ]
+          ],
+          "timeField": "report_date"
         }
       ],
       "title": "現在の分析対象ドメイン情報",
-      "type": "table"
+      "type": "gauge"
     },
     {
       "datasource": {
-        "type": "frser-sqlite-datasource",
-        "uid": "P90DAF5EEE766B0A3"
+        "type": "elasticsearch",
+        "uid": "P31C819B24CF3C3C7"
       },
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 7,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ],
+          "fields": "/^Email reach rate$/",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": false,
+        "sizing": "auto"
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "alias": "policy_evaluated.disposition",
+          "bucketAggs": [
+            {
+              "field": "report_date",
+              "id": "2",
+              "settings": {
+                "interval": "1d"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "policy_evaluated.disposition:(\"none\" OR \"deliver\") ",
+          "queryText": "WITH domain_info AS (\r\n    SELECT \r\n        substr(f.from_address, instr(f.from_address, '@') + 1) as domain,\r\n        COUNT(DISTINCT f.source_ip) as unique_ips,\r\n        COUNT(*) as report_count,\r\n        COUNT(DISTINCT a.organization) as org_count,\r\n        SUM(a.count) as total_mails,\r\n        date(min(f.created_at)) as start_date,\r\n        date(max(f.created_at)) as end_date\r\n    FROM dmarc_forensic f\r\n    LEFT JOIN dmarc_aggregate a ON f.source_ip = a.source_ip\r\n    GROUP BY substr(f.from_address, instr(f.from_address, '@') + 1)\r\n)\r\nSELECT \r\n    domain as \"分析対象ドメイン\",\r\n    org_count as \"レポート送信組織数\",\r\n    unique_ips as \"送信元IP数\",\r\n    report_count as \"レポート数\",\r\n    total_mails as \"総メール数\",\r\n    start_date as \"データ開始日\",\r\n    end_date as \"データ最終日\"\r\nFROM domain_info\r\nORDER BY total_mails DESC;",
+          "queryType": "table",
+          "rawQueryText": "WITH domain_info AS (\r\n    SELECT \r\n        substr(f.from_address, instr(f.from_address, '@') + 1) as domain,\r\n        COUNT(DISTINCT f.source_ip) as unique_ips,\r\n        COUNT(*) as report_count,\r\n        COUNT(DISTINCT a.organization) as org_count,\r\n        SUM(a.count) as total_mails,\r\n        date(min(f.created_at)) as start_date,\r\n        date(max(f.created_at)) as end_date\r\n    FROM dmarc_forensic f\r\n    LEFT JOIN dmarc_aggregate a ON f.source_ip = a.source_ip\r\n    GROUP BY substr(f.from_address, instr(f.from_address, '@') + 1)\r\n)\r\nSELECT \r\n    domain as \"分析対象ドメイン\",\r\n    org_count as \"レポート送信組織数\",\r\n    unique_ips as \"送信元IP数\",\r\n    report_count as \"レポート数\",\r\n    total_mails as \"総メール数\",\r\n    start_date as \"データ開始日\",\r\n    end_date as \"データ最終日\"\r\nFROM domain_info\r\nORDER BY total_mails DESC;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "ts"
+          ],
+          "timeField": "report_date"
+        },
+        {
+          "alias": "",
+          "bucketAggs": [
+            {
+              "field": "report_date",
+              "id": "2",
+              "settings": {
+                "interval": "1d"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "P31C819B24CF3C3C7"
+          },
+          "hide": false,
+          "metrics": [
+            {
+              "field": "count",
+              "id": "1",
+              "type": "sum"
+            }
+          ],
+          "query": "",
+          "refId": "B",
+          "timeField": "report_date"
+        }
+      ],
+      "title": "メールの到達率",
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "policy_evaluated.disposition"
+                }
+              },
+              "operator": "/",
+              "right": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Sum count"
+                }
+              }
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Email reach rate",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "policy_evaluated.disposition / Sum count"
+                }
+              },
+              "operator": "*",
+              "right": {
+                "fixed": "100"
+              }
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
+        }
+      ],
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "P31C819B24CF3C3C7"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "red",
+            "mode": "fixed"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 15,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "mean"
+          ],
+          "fields": "/^Error Rate \\(%\\)$/",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": false,
+        "sizing": "auto"
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "alias": "Total Count",
+          "bucketAggs": [
+            {
+              "field": "report_date",
+              "id": "2",
+              "settings": {
+                "interval": "1d"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "metrics": [
+            {
+              "field": "count",
+              "id": "1",
+              "type": "sum"
+            }
+          ],
+          "query": "",
+          "queryText": "WITH domain_info AS (\r\n    SELECT \r\n        substr(f.from_address, instr(f.from_address, '@') + 1) as domain,\r\n        COUNT(DISTINCT f.source_ip) as unique_ips,\r\n        COUNT(*) as report_count,\r\n        COUNT(DISTINCT a.organization) as org_count,\r\n        SUM(a.count) as total_mails,\r\n        date(min(f.created_at)) as start_date,\r\n        date(max(f.created_at)) as end_date\r\n    FROM dmarc_forensic f\r\n    LEFT JOIN dmarc_aggregate a ON f.source_ip = a.source_ip\r\n    GROUP BY substr(f.from_address, instr(f.from_address, '@') + 1)\r\n)\r\nSELECT \r\n    domain as \"分析対象ドメイン\",\r\n    org_count as \"レポート送信組織数\",\r\n    unique_ips as \"送信元IP数\",\r\n    report_count as \"レポート数\",\r\n    total_mails as \"総メール数\",\r\n    start_date as \"データ開始日\",\r\n    end_date as \"データ最終日\"\r\nFROM domain_info\r\nORDER BY total_mails DESC;",
+          "queryType": "table",
+          "rawQueryText": "WITH domain_info AS (\r\n    SELECT \r\n        substr(f.from_address, instr(f.from_address, '@') + 1) as domain,\r\n        COUNT(DISTINCT f.source_ip) as unique_ips,\r\n        COUNT(*) as report_count,\r\n        COUNT(DISTINCT a.organization) as org_count,\r\n        SUM(a.count) as total_mails,\r\n        date(min(f.created_at)) as start_date,\r\n        date(max(f.created_at)) as end_date\r\n    FROM dmarc_forensic f\r\n    LEFT JOIN dmarc_aggregate a ON f.source_ip = a.source_ip\r\n    GROUP BY substr(f.from_address, instr(f.from_address, '@') + 1)\r\n)\r\nSELECT \r\n    domain as \"分析対象ドメイン\",\r\n    org_count as \"レポート送信組織数\",\r\n    unique_ips as \"送信元IP数\",\r\n    report_count as \"レポート数\",\r\n    total_mails as \"総メール数\",\r\n    start_date as \"データ開始日\",\r\n    end_date as \"データ最終日\"\r\nFROM domain_info\r\nORDER BY total_mails DESC;",
+          "refId": "A",
+          "timeColumns": [
+            "time",
+            "ts"
+          ],
+          "timeField": "report_date"
+        },
+        {
+          "alias": "Error Count",
+          "bucketAggs": [
+            {
+              "field": "report_date",
+              "id": "2",
+              "settings": {
+                "interval": "1d"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "P31C819B24CF3C3C7"
+          },
+          "hide": false,
+          "metrics": [
+            {
+              "field": "count",
+              "id": "1",
+              "type": "sum"
+            }
+          ],
+          "query": "policy_evaluated.dkim: (\"fail\" OR \"neutral\" OR \"softfail\") OR policy_evaluated.spf: (\"fail\" OR \"neutral\" OR \"softfail\")",
+          "refId": "B",
+          "timeField": "report_date"
+        }
+      ],
+      "title": "SPFとDKIMの合計で計算したエラー率",
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Error Rate ",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Error Count"
+                }
+              },
+              "operator": "/",
+              "right": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Total Count"
+                }
+              }
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "Error Rate (%)",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Error Rate "
+                }
+              },
+              "operator": "*",
+              "right": {
+                "fixed": "100"
+              }
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
+        }
+      ],
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "P31C819B24CF3C3C7"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#B877D9",
+            "mode": "fixed"
           },
           "custom": {
             "axisBorderShow": false,
             "axisCenteredZero": false,
-            "axisColorMode": "text",
+            "axisColorMode": "series",
             "axisLabel": "",
             "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 20,
-            "gradientMode": "none",
+            "fillOpacity": 91,
+            "gradientMode": "opacity",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
             },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 5,
+            "lineWidth": 4,
             "scaleDistribution": {
               "type": "linear"
-            },
-            "showPoints": "always",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
             },
             "thresholdsStyle": {
               "mode": "off"
@@ -145,7 +474,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "SPF成功率"
+              "options": "SPF成功率（％）"
             },
             "properties": [
               {
@@ -158,17 +487,13 @@
                   "fixedColor": "green",
                   "mode": "fixed"
                 }
-              },
-              {
-                "id": "custom.axisPlacement",
-                "value": "right"
               }
             ]
           },
           {
             "matcher": {
               "id": "byName",
-              "options": "DKIM成功率"
+              "options": "DKIM成功率（％）"
             },
             "properties": [
               {
@@ -181,10 +506,6 @@
                   "fixedColor": "blue",
                   "mode": "fixed"
                 }
-              },
-              {
-                "id": "custom.axisPlacement",
-                "value": "right"
               }
             ]
           },
@@ -194,10 +515,6 @@
               "options": "SPFエラー数"
             },
             "properties": [
-              {
-                "id": "custom.axisPlacement",
-                "value": "left"
-              },
               {
                 "id": "color",
                 "value": {
@@ -214,10 +531,6 @@
             },
             "properties": [
               {
-                "id": "custom.axisPlacement",
-                "value": "left"
-              },
-              {
                 "id": "color",
                 "value": {
                   "fixedColor": "orange",
@@ -232,35 +545,53 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 6
+        "y": 8
       },
       "id": 1,
       "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 1,
         "legend": {
-          "calcs": [
-            "mean",
-            "max",
-            "min"
-          ],
-          "displayMode": "table",
+          "calcs": [],
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
-        "timezone": [
-          "browser"
-        ],
+        "orientation": "vertical",
+        "showValue": "always",
+        "stacking": "none",
+        "text": {},
         "tooltip": {
-          "mode": "multi",
-          "sort": "none"
+          "mode": "none",
+          "sort": "asc"
         },
-        "xAxis": {
-          "mode": "time",
-          "timeFormat": "YYYY-MM-DD"
-        }
+        "xField": "Time",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 100
       },
       "pluginVersion": "11.3.0",
       "targets": [
         {
+          "alias": "SPF成功件数",
+          "bucketAggs": [
+            {
+              "field": "report_date",
+              "id": "2",
+              "settings": {
+                "interval": "1d"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "auth_results.spf:pass",
           "queryText": "SELECT \n    date(created_at) || ' 00:00:00' as \"time\",\n    organization as \"組織\",\n    SUM(CASE WHEN spf_result != 'pass' THEN count ELSE 0 END) as \"SPFエラー数\",\n    SUM(CASE WHEN dkim_result != 'pass' THEN count ELSE 0 END) as \"DKIMエラー数\",\n    ROUND(SUM(CASE WHEN spf_result = 'pass' THEN count ELSE 0 END) * 100.0 / SUM(count), 2) as \"SPF成功率\",\n    ROUND(SUM(CASE WHEN dkim_result = 'pass' THEN count ELSE 0 END) * 100.0 / SUM(count), 2) as \"DKIM成功率\"\nFROM dmarc_aggregate\nGROUP BY date(created_at), organization\nORDER BY time;",
           "queryType": "table",
           "rawQueryText": "SELECT \n    date(created_at) || ' 00:00:00' as \"time\",\n    organization as \"組織\",\n    SUM(CASE WHEN spf_result != 'pass' THEN count ELSE 0 END) as \"SPFエラー数\",\n    SUM(CASE WHEN dkim_result != 'pass' THEN count ELSE 0 END) as \"DKIMエラー数\",\n    ROUND(SUM(CASE WHEN spf_result = 'pass' THEN count ELSE 0 END) * 100.0 / SUM(count), 2) as \"SPF成功率\",\n    ROUND(SUM(CASE WHEN dkim_result = 'pass' THEN count ELSE 0 END) * 100.0 / SUM(count), 2) as \"DKIM成功率\"\nFROM dmarc_aggregate\nGROUP BY date(created_at), organization\nORDER BY time;",
@@ -268,11 +599,219 @@
           "timeColumns": [
             "time",
             "ts"
-          ]
+          ],
+          "timeField": "report_date"
+        },
+        {
+          "alias": "DKIM成功件数",
+          "bucketAggs": [
+            {
+              "field": "report_date",
+              "id": "2",
+              "settings": {
+                "interval": "1d"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "P31C819B24CF3C3C7"
+          },
+          "hide": false,
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "auth_results.dkim:pass",
+          "refId": "B",
+          "timeField": "report_date"
+        },
+        {
+          "alias": "SPFエラー数",
+          "bucketAggs": [
+            {
+              "field": "report_date",
+              "id": "2",
+              "settings": {
+                "interval": "1d"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "P31C819B24CF3C3C7"
+          },
+          "hide": false,
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "auth_results.spf:fail",
+          "refId": "C",
+          "timeField": "report_date"
+        },
+        {
+          "alias": "DKIMエラー数",
+          "bucketAggs": [
+            {
+              "field": "report_date",
+              "id": "2",
+              "settings": {
+                "interval": "1d"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "P31C819B24CF3C3C7"
+          },
+          "hide": false,
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "auth_results.dkim:fail",
+          "refId": "D",
+          "timeField": "report_date"
+        },
+        {
+          "alias": "メール総数",
+          "bucketAggs": [
+            {
+              "field": "report_date",
+              "id": "2",
+              "settings": {
+                "interval": "1d"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "P31C819B24CF3C3C7"
+          },
+          "hide": false,
+          "metrics": [
+            {
+              "field": "count",
+              "id": "1",
+              "type": "sum"
+            }
+          ],
+          "query": "",
+          "refId": "E",
+          "timeField": "report_date"
         }
       ],
       "title": "DMARC認証結果の日次推移",
-      "type": "timeseries"
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "SPF成功率",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "SPF成功件数"
+                }
+              },
+              "operator": "/",
+              "right": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "メール総数"
+                }
+              }
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            },
+            "replaceFields": false
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "SPF成功率（％）",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "SPF成功率"
+                }
+              },
+              "operator": "*",
+              "right": {
+                "fixed": "100"
+              }
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "DKIM成功率",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "DKIM成功件数"
+                }
+              },
+              "operator": "/",
+              "right": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "メール総数"
+                }
+              }
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            },
+            "replaceFields": false
+          }
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "DKIM成功率（％）",
+            "binary": {
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "DKIM成功率"
+                }
+              },
+              "operator": "*",
+              "right": {
+                "fixed": "100"
+              }
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
+        }
+      ],
+      "type": "barchart"
     }
   ],
   "preload": false,
@@ -289,6 +828,6 @@
   "timezone": "",
   "title": "DMARCレポート概要",
   "uid": "ee2lgvv68smbkb",
-  "version": 15,
+  "version": 1,
   "weekStart": ""
 }

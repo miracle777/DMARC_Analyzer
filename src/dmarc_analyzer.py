@@ -51,62 +51,74 @@ class DMARCAnalyzer:
             )
         else:
             self.customer_id = customer_info['id']
-
-    def process_report_file(self, file_path):
-        if file_path in self.processed_files:
-            logger.info(f"Skipping duplicate file: {file_path}")
-            return
-
-        self.processed_files.add(file_path)
-
-        if file_path.endswith(".xml"):
-            self._process_xml_file(file_path)
-        elif file_path.endswith(".gz"):
-            self._process_gz_file(file_path)
-        elif file_path.endswith(".zip"):
-            self._process_zip_file(file_path)
-        else:
-            logger.warning(f"Unsupported file type: {file_path}")
-
-    def _process_xml_file(self, xml_path):
-        try:
-            logger.info(f"Processing XML file: {xml_path}")
-            tree = ET.parse(xml_path)
-            root = tree.getroot()
-            report_data = self._parse_xml_report(root)
-            self._store_report_data(report_data)
-        except ET.ParseError as e:
-            logger.error(f"Failed to parse XML file {xml_path}: {e}")
-
-    def _parse_xml_report(self, root):
-        report_data = {}
-        return report_data
-
-    def _store_report_data(self, report_data):
-        pass
-        
-        # 設定の初期化
+            
+        # 初期化を__init__で実行
         self._initialize()
 
     def analyze_reports(self):
-            """レポートディレクトリ内のXMLファイルを解析"""
-            logger.info(f"Analyzing reports in directory: {self.report_directory}")
-            
+        """レポートディレクトリ内のXMLファイルを解析"""
+        logger.info(f"Analyzing reports in directory: {self.report_directory}")
+        
+        try:
             # レポートディレクトリ内の全ファイルを確認
             for root, _, files in os.walk(self.report_directory):
                 for file in files:
                     file_path = os.path.join(root, file)
                     if file.endswith(".xml"):
                         logger.info(f"Processing XML file: {file_path}")
-                        self.process_xml_file(file_path)
+                        self.process_report_file(file_path)
                     elif file.endswith((".zip", ".gz")):
                         logger.info(f"Extracting archive file: {file_path}")
                         extracted_files = self._extract_nested_archives(file_path, self.extract_directory)
                         for extracted_file in extracted_files:
                             if extracted_file.endswith(".xml"):
                                 logger.info(f"Processing extracted XML file: {extracted_file}")
-                                self.process_xml_file(extracted_file)
+                                self.process_report_file(extracted_file)
+        except Exception as e:
+            logger.error(f"Error analyzing reports: {e}")
+            raise
 
+    def process_report_file(self, file_path):
+        """レポートファイルの処理（重複チェック含む）"""
+        if file_path in self.processed_files:
+            logger.info(f"Skipping duplicate file: {file_path}")
+            return
+
+        self.processed_files.add(file_path)
+        self.process_xml_file(file_path)
+
+    def process_xml_file(self, xml_file_path: str) -> None:
+        """XMLファイルを直接処理してElasticsearchに保存"""
+        logger.info(f"XMLファイルの処理開始: {xml_file_path}")
+        
+        try:
+            # インデックスの存在確認と作成
+            current_month = datetime.now().strftime("%Y.%m")
+            aggregate_index = f"aggregate_reports-{current_month}"
+
+            if not self.es.indices.exists(index=aggregate_index):
+                setup_elasticsearch_indices(self.es)
+                logger.info("Created required indices")
+
+            # XMLファイルのパース
+            tree = ET.parse(xml_file_path)
+            root = tree.getroot()
+            
+            # レポートタイプの判定とパース
+            if root.tag == 'feedback':
+                report_data = self._parse_aggregate_report(root)
+                if report_data:
+                    self._save_aggregate_report(report_data)
+                    logger.info(f"集計レポートを保存しました: {xml_file_path}")
+                else:
+                    logger.warning(f"集計レポートのパースに失敗: {xml_file_path}")
+            else:
+                logger.warning(f"未対応のXMLフォーマット: {xml_file_path}")
+                
+        except ET.ParseError as e:
+            logger.error(f"XMLパースエラー {xml_file_path}: {e}")
+        except Exception as e:
+            logger.error(f"予期せぬエラー {xml_file_path}: {e}")
 
     def _initialize(self):
         """初期化処理"""
@@ -125,6 +137,7 @@ class DMARCAnalyzer:
         except Exception as e:
             logger.error(f"Initialization error: {e}")
             raise
+   
 
     def _save_aggregate_report(self, report):
         """集計レポートの保存（バッチ処理対応）"""
