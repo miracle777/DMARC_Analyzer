@@ -1,13 +1,14 @@
 apiVersion: 1
 
 providers:
-  - name: 'DefaultProvider'
+  - name: 'DMARC Dashboards'
     orgId: 1
-    folder: ''
+    folder: 'DMARC'
+    folderUid: ''
     type: file
     disableDeletion: false
-    allowUiUpdates: true  # UIでの更新を許可
-    updateIntervalSeconds: 60  # 更新間隔を1分に設定
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
     options:
       path: /var/lib/grafana/dashboards
       foldersFromFilesStructure: true

@@ -18,13 +18,13 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 2,
   "links": [],
   "panels": [
     {
       "datasource": {
         "type": "elasticsearch",
-        "uid": "P31C819B24CF3C3C7"
+        "uid": "PCFA1C57C50845E0D"
       },
       "fieldConfig": {
         "defaults": {
@@ -106,7 +106,7 @@
     {
       "datasource": {
         "type": "elasticsearch",
-        "uid": "P31C819B24CF3C3C7"
+        "uid": "PCFA1C57C50845E0D"
       },
       "fieldConfig": {
         "defaults": {
@@ -266,7 +266,7 @@
     {
       "datasource": {
         "type": "elasticsearch",
-        "uid": "P31C819B24CF3C3C7"
+        "uid": "PCFA1C57C50845E0D"
       },
       "fieldConfig": {
         "defaults": {
@@ -429,7 +429,7 @@
     {
       "datasource": {
         "type": "elasticsearch",
-        "uid": "P31C819B24CF3C3C7"
+        "uid": "PCFA1C57C50845E0D"
       },
       "fieldConfig": {
         "defaults": {
@@ -920,7 +920,7 @@
     {
       "datasource": {
         "type": "elasticsearch",
-        "uid": "P31C819B24CF3C3C7"
+        "uid": "PCFA1C57C50845E0D"
       },
       "fieldConfig": {
         "defaults": {
@@ -967,7 +967,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -980,7 +981,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 9,
+        "h": 13,
         "w": 24,
         "x": 0,
         "y": 24
@@ -988,14 +989,13 @@
       "id": 6,
       "options": {
         "legend": {
-          "calcs": [],
+          "calcs": [
+            "sum"
+          ],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
-        "timezone": [
-          "browser"
-        ],
         "tooltip": {
           "mode": "single",
           "sort": "none"
@@ -1003,6 +1003,60 @@
       },
       "pluginVersion": "11.3.0",
       "targets": [
+        {
+          "alias": "spf:fail",
+          "bucketAggs": [
+            {
+              "field": "report_date",
+              "id": "2",
+              "settings": {
+                "interval": "1d"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "PCFA1C57C50845E0D"
+          },
+          "hide": false,
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "policy_published.domain:(${domain}) AND auth_results.spf:fail",
+          "refId": "F",
+          "timeField": "report_date"
+        },
+        {
+          "alias": "dkim:fail",
+          "bucketAggs": [
+            {
+              "field": "report_date",
+              "id": "2",
+              "settings": {
+                "interval": "1d"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "PCFA1C57C50845E0D"
+          },
+          "hide": false,
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "policy_published.domain:(${domain}) AND auth_results.dkim:fail",
+          "refId": "G",
+          "timeField": "report_date"
+        },
         {
           "alias": "spf:softfail",
           "bucketAggs": [
@@ -1021,7 +1075,7 @@
               "type": "count"
             }
           ],
-          "query": "auth_results.spf:softfail",
+          "query": "policy_published.domain:(${domain}) AND auth_results.spf:softfail",
           "refId": "A",
           "timeField": "report_date"
         },
@@ -1032,7 +1086,7 @@
               "field": "report_date",
               "id": "2",
               "settings": {
-                "interval": "auto"
+                "interval": "1d"
               },
               "type": "date_histogram"
             }
@@ -1048,7 +1102,7 @@
               "type": "count"
             }
           ],
-          "query": "auth_results.dkim:neutral",
+          "query": "policy_published.domain:(${domain}) AND auth_results.dkim:neutral",
           "refId": "B",
           "timeField": "report_date"
         },
@@ -1059,7 +1113,7 @@
               "field": "report_date",
               "id": "2",
               "settings": {
-                "interval": "auto"
+                "interval": "1d"
               },
               "type": "date_histogram"
             }
@@ -1075,7 +1129,7 @@
               "type": "count"
             }
           ],
-          "query": "disposition:none",
+          "query": "policy_published.domain:(${domain}) AND policy_evaluated.disposition:none",
           "refId": "E",
           "timeField": "report_date"
         },
@@ -1086,7 +1140,7 @@
               "field": "report_date",
               "id": "2",
               "settings": {
-                "interval": "auto"
+                "interval": "1d"
               },
               "type": "date_histogram"
             }
@@ -1102,7 +1156,7 @@
               "type": "count"
             }
           ],
-          "query": "policy_evaluated.disposition:quarantine",
+          "query": "policy_published.domain:(${domain}) AND policy_evaluated.disposition:quarantine",
           "refId": "C",
           "timeField": "report_date"
         },
@@ -1113,7 +1167,7 @@
               "field": "report_date",
               "id": "2",
               "settings": {
-                "interval": "auto"
+                "interval": "1d"
               },
               "type": "date_histogram"
             }
@@ -1129,7 +1183,7 @@
               "type": "count"
             }
           ],
-          "query": "disposition:reject",
+          "query": "policy_published.domain:(${domain}) AND policy_evaluated.disposition:reject",
           "refId": "D",
           "timeField": "report_date"
         }
@@ -1171,8 +1225,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "DMARCレポート概要",
-  "uid": "ee2lgvv68smbkb",
-  "version": 15,
+  "title": "DMARCレポート概要バックアップ",
+  "uid": "ce2vsl7rxxjwga01",
+  "version": 1,
   "weekStart": ""
 }

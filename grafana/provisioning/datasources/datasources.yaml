@@ -16,4 +16,4 @@ datasources:
     url: http://elasticsearch:9200
     database: "forensic_reports-*"
     jsonData:
-      timeField: "report_date"
+      timeField: "@timestamp"

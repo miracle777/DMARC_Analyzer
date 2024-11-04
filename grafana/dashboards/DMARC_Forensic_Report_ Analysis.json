@@ -1,0 +1,476 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 4,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "PB51EE76C996E8F0B"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 5,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "auto",
+        "showValue": "never",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "Time",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 100
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "alias": "",
+          "bucketAggs": [
+            {
+              "field": "@timestamp",
+              "id": "2",
+              "settings": {
+                "interval": "1d"
+              },
+              "type": "date_histogram"
+            }
+          ],
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "PB51EE76C996E8F0B"
+          },
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "report_metadata.org_name:\"$domain\"",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "title": "レポート推移",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "PB51EE76C996E8F0B"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "max": 9,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 7,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": true
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "alias": "",
+          "bucketAggs": [
+            {
+              "field": "auth_results.dkim.result",
+              "id": "2",
+              "settings": {
+                "min_doc_count": "1",
+                "order": "desc",
+                "orderBy": "_term",
+                "size": "10"
+              },
+              "type": "terms"
+            }
+          ],
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "PB51EE76C996E8F0B"
+          },
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "report_metadata.org_name:\"$domain\"",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "title": "DKIMエラー件数",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "PB51EE76C996E8F0B"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 8,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": true
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "alias": "",
+          "bucketAggs": [
+            {
+              "field": "auth_results.spf.result",
+              "id": "2",
+              "settings": {
+                "min_doc_count": "1",
+                "order": "desc",
+                "orderBy": "_term",
+                "size": "10"
+              },
+              "type": "terms"
+            }
+          ],
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "PB51EE76C996E8F0B"
+          },
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "query": "report_metadata.org_name:\"$domain\" ",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "title": "SPFエラー件数",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "PB51EE76C996E8F0B"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
+      "id": 9,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": true
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.3.0",
+      "targets": [
+        {
+          "alias": "",
+          "bucketAggs": [],
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "PB51EE76C996E8F0B"
+          },
+          "metrics": [
+            {
+              "id": "1",
+              "settings": {
+                "size": "500"
+              },
+              "type": "raw_data"
+            }
+          ],
+          "query": "auth_results.dkim.result:\"fail\" OR auth_results.spf.result:\"fail\" OR auth_results.dmarc.result:\"fail\"",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "title": "Panel Title",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "@timestamp": false,
+              "_id": true,
+              "_index": true,
+              "highlight": true,
+              "report_date": false,
+              "report_metadata.report_id": true,
+              "sort": true
+            },
+            "includeByName": {},
+            "indexByName": {},
+            "renameByName": {
+              "@timestamp": "",
+              "auth_results.dkim.domain": "DKIM ドメイン",
+              "auth_results.dkim.result": "DKIM 認証結果",
+              "auth_results.dkim.selector": "DKIM セレクタ",
+              "auth_results.spf.domain": "SPF ドメイン",
+              "auth_results.spf.result": "SPF 認証結果",
+              "auth_results.spf.scope": "SPF スコープ",
+              "failure_details.reason": "失敗理由",
+              "feedback_type": "レポートタイプ",
+              "highlight": "",
+              "identity_alignment.dkim": "DKIM アイデンティティ整合性",
+              "identity_alignment.spf": "SPF アイデンティティ整合性",
+              "original_mail_data.content": "元メールデータ（内容）",
+              "original_mail_data.encoding": "元メールデータ（64エンコーディング）",
+              "report_date": "レポート日",
+              "report_metadata.date_range": "レポート対象期間",
+              "report_metadata.email": "レポート送信者のメールアドレス",
+              "report_metadata.org_name": "レポート送信者の組織名",
+              "report_metadata.report_id": "レポートID",
+              "sort": "ソート",
+              "version": "バージョン"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "refresh": "auto",
+  "schemaVersion": 40,
+  "tags": [
+    "dmarc",
+    "forensic"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": [
+            "example.com"
+          ],
+          "value": [
+            "example.com"
+          ]
+        },
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "PB51EE76C996E8F0B"
+        },
+        "definition": "{\"find\": \"terms\", \"field\": \"report_metadata.org_name\", \"size\": 100}",
+        "includeAll": true,
+        "label": "domain",
+        "multi": true,
+        "name": "domain",
+        "options": [],
+        "query": "{\"find\": \"terms\", \"field\": \"report_metadata.org_name\", \"size\": 100}",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "2024-09-20T11:41:24.027Z",
+    "to": "2024-11-19T11:41:24.027Z"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "DMARC Forensic Reports Analysis",
+  "uid": "dmarc_forensic01",
+  "version": 12,
+  "weekStart": ""
+}

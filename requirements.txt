@@ -3,3 +3,4 @@ xmltodict
 elasticsearch>=7.17.0,<8.0.0
 requests==2.31.0
 python-dateutil
+watchdog==3.0.0
