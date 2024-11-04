@@ -4,30 +4,7 @@ import logging
 from elasticsearch import helpers 
 from elasticsearch import Elasticsearch
 
-def get_domain_from_policy():
-    # Initialize Elasticsearch client
-    es = Elasticsearch("http://localhost:9200")  # Adjust this URL if necessary
 
-    # Perform search to get the `policy_published.domain` field
-    response = es.search(
-        index="aggregate_reports-*",
-        body={
-            "size": 1,
-            "_source": ["policy_published.domain"],
-            "query": {
-                "match_all": {}
-            }
-        }
-    )
-
-    # Extract domain from response
-    hits = response.get('hits', {}).get('hits', [])
-    if hits:
-        domain = hits[0].get('_source', {}).get('policy_published', {}).get('domain', "default.com")
-    else:
-        domain = "default.com"  # Default domain if not found
-
-    return domain
 
 
 logger = logging.getLogger(__name__)
@@ -71,7 +48,7 @@ def generate_report_stats(records: List[Dict[str, Any]], domain: str) -> Dict[st
 
     return stats
 
-def check_duplicate_report(es, report_id: str, customer_id: str) -> bool:
+def check_duplicate_report(es, report_id: str) -> bool:
     """重複レポートのチェック"""
     try:
         result = es.search(
@@ -80,8 +57,8 @@ def check_duplicate_report(es, report_id: str, customer_id: str) -> bool:
                 "query": {
                     "bool": {
                         "must": [
-                            {"term": {"report_id": report_id}},
-                            {"term": {"customer_id": customer_id}}
+                            {"term": {"report_id": report_id}}
+                           
                         ]
                     }
                 }

@@ -1,33 +1,54 @@
 
 from elasticsearch import Elasticsearch
-
-def get_domain_from_policy():
-    # Initialize Elasticsearch client
-    es = Elasticsearch("http://localhost:9200")  # Adjust this URL if necessary
-
-    # Perform search to get the `policy_published.domain` field
-    response = es.search(
-        index="aggregate_reports-*",
-        body={
-            "size": 1,
-            "_source": ["policy_published.domain"],
-            "query": {
-                "match_all": {}
-            }
-        }
-    )
-
-    # Extract domain from response
-    hits = response.get('hits', {}).get('hits', [])
-    if hits:
-        domain = hits[0].get('_source', {}).get('policy_published', {}).get('domain', "default.com")
-    else:
-        domain = "default.com"  # Default domain if not found
-
-    return domain
-
 import xml.etree.ElementTree as ET
 from datetime import datetime
+
+
+def get_domain_from_policy():
+    """
+    Elasticsearchから最新のDMARCポリシーのドメインを取得
+    
+    Returns:
+        str: 検出されたドメイン
+        
+    Raises:
+        Exception: Elasticsearchからドメインの取得に失敗した場合
+    """
+    try:
+        # ElasticsearchクライアントをDockerネットワークに合わせて初期化
+        es = Elasticsearch("http://elasticsearch:9200")
+        
+        # インデックスの存在確認
+        if not es.indices.exists(index="aggregate_reports-*"):
+            raise Exception("No aggregate reports index found")
+            
+        # 最新のドメインを取得
+        response = es.search(
+            index="aggregate_reports-*",
+            body={
+                "size": 1,
+                "_source": ["policy_published.domain"],
+                "sort": [{"date_range.begin": "desc"}],  # 最新のレコードを取得
+                "query": {
+                    "exists": {
+                        "field": "policy_published.domain"
+                    }
+                }
+            }
+        )
+
+        hits = response.get('hits', {}).get('hits', [])
+        if not hits:
+            raise Exception("No domain found in aggregate reports")
+            
+        domain = hits[0].get('_source', {}).get('policy_published', {}).get('domain')
+        if not domain:
+            raise Exception("Domain field is empty in the latest record")
+            
+        return domain
+
+    except Exception as e:
+        raise Exception(f"Failed to retrieve domain from Elasticsearch: {str(e)}")
 
 def parse_aggregate_report(root):
     """Parse DMARC aggregate report"""

@@ -40,7 +40,14 @@ docker-compose build
 docker-compose up -d
 ```
 
-
+```bash
+docker-compose up --build
+```
+は、せっかく作ったGrafanaのパネルのデータが消えてしまうリスクがあると思います。
+```bash
+docker-compose up -d
+```
+で、コンテナを起動してください。
 
 
 ## 使用方法
@@ -48,6 +55,8 @@ docker-compose up -d
 filesのフォルダsの中に、DMARCのレポートをZipまたはGz形式の圧縮ファイルのままセットしてください。
 
 ### コマンドラインインターフェース
+2024年11月4日現在動作確認していないので、実装されていますが保証できません。
+理由は、ドメインの環境変数の扱いをGrafanaの環境変数を使う方式に変更しているため。
 
 DMARCレポートの解析は、以下のコマンドラインオプションを使用して実行できます：
 
@@ -56,57 +65,24 @@ DMARCレポートの解析は、以下のコマンドラインオプションを
 python src/dmarc_analyzer_cli.py --domain example.com
 ```
 
-2. 登録済み顧客の一覧表示：
-```bash
-python src/dmarc_analyzer_cli.py --list-customers
-```
-
-3. すべての登録済み顧客のレポートを一括処理：
-```bash
-python src/dmarc_analyzer_cli.py --all-customers
-```
-
-4. カスタムディレクトリの指定：
+2 カスタムディレクトリの指定：
 ```bash
 python src/dmarc_analyzer_cli.py --domain example.com \
   --report-dir /custom/reports \
   --extract-dir /custom/extracted
 ```
 
-5.XMLファイルの直接処理:
+3.XMLファイルの直接処理:
 ```bash
 python dmarc_analyzer_cli.py --xml-file /path/to/dmarc_report.xml
 ```
 
-6.ドメインとXMLファイルの両方を指定:
+4.ドメインとXMLファイルの両方を指定:
 ```bash
 python dmarc_analyzer_cli.py --domain example.com --xml-file /path/to/dmarc_report.xml
 ```
 
 
-### 顧客管理
-
-各ドメインのDMARCレポートは、顧客IDによって管理されます。
-
-1. 新規顧客の自動登録：
-- 初めてドメインを指定して解析を実行すると、自動的に顧客として登録されます
-- 顧客IDは`CUST_{ドメイン名}_{ハッシュ}`の形式で生成されます
-- 例：`CUST_example_com_a1b2c3d4`
-
-2. 顧客情報の確認：
-```bash
-python src/dmarc_analyzer_cli.py --list-customers
-```
-出力例：
-```
-登録済み顧客一覧:
---------------------------------------------------------------------------------
-顧客ID                          ドメイン            組織名              状態
---------------------------------------------------------------------------------
-CUST_example_com_a1b2c3d4     example.com        Example Corp        有効
-CUST_sample_org_b2c3d4e5      sample.org         Sample Org         有効
---------------------------------------------------------------------------------
-```
 
 
 
@@ -154,14 +130,10 @@ DMARC_Analyzer/
 データは以下の形式でElasticsearchに保存されます：
 
 1. aggregate_reports-YYYY.MM インデックス：
-- 集計レポートのデータ
-- 月単位でインデックスを分割
-- customer_idによるデータの分離
+エラーの概要解析
 
 2. dmarc_stats-YYYY.MM インデックス：
-- 統計情報
-- 認証成功率などの集計データ
-- 顧客ごとの月次サマリー
+個別のエラーの詳細解析
 
 
 
@@ -201,31 +173,18 @@ http://localhost:3000
 
 ### ダッシュボード構成
 
-1. `dmarc_summary_dashboard.json`
-  - 概要：DMARCレポートの概要ダッシュボード
-  - 主な機能：
-  - 分析対象ドメインの情報表示
-  - SPF/DKIM認証結果の全体概要
-  - 組織別の認証状況
-
-2. `dmarc_daily_analysis.json`
-  - 概要：単日のDMARC詳細分析用ダッシュボード
-  - 主な機能：
-  - 時間帯別の認証結果推移
-  - 詳細なエラー分析
-  - 送信元IPごとの分析
-
-3. `dmarc_trend_analysis.json`
-  - 概要：長期トレンド分析用ダッシュボード
-  - 主な機能：
-  - 日次の認証結果推移
-  - 組織別の認証成功率トレンド
-  - 週次/月次のサマリー
-
 上記は、実装予定も含みます。
 
 
 ### ダッシュボードの更新手順
+
+#### UIで変更したダッシュボードをエクスポートする手順
+1. ダッシュボードの設定から「Export」を選択
+2. 「Export for sharing externally」を選択
+3. JSONファイルとして保存
+4. 保存したJSONファイルを`./dashboards`ディレクトリに配置
+
+
 
 1. エクスポート：
 ```
@@ -291,6 +250,9 @@ src/
 
 
 ### Grafanaダッシュボードの管理
+ローカルのフォルダをマウントしています。
+そのためDockerでコンテナのビルドを行うと、フォルダが増えます。
+ローカルのフォルダをマウントすることで、設定の永続化を行っています。
 
 1. ダッシュボードのエクスポート：
   - Grafana UIで Share dashboard → Export
@@ -330,6 +292,11 @@ src/
   - システムを停止する場合は `docker-compose down` を使用
   - データベースのバックアップは定期的に実施することを推奨
   - Grafanaの初期パスワードは必ず変更してください
+
+## 補足
+2024年11月3日現在forensic_reports-*のインデックスを生成するためのフォレンジックレポートのXMLのフォーマットの実際のデータが無いので、
+データソースのElasticsearchのForensic Reportsは、接続テストが行われていません。
+データソースのElasticsearchのForensic Reportsは、Grafanaのデータソースに、登録されています。
 
 
 ## ライセンス

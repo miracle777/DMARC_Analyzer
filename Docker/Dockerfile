@@ -20,8 +20,8 @@ RUN pip install requests
 RUN pip install elasticsearch
 
 # Copy requirements first to leverage Docker cache
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt /requirements.txt
+RUN pip install --no-cache-dir -r /requirements.txt
 
 # Copy source code
 COPY src/ /app/src/

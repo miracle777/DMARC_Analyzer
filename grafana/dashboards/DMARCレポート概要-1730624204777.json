@@ -1145,16 +1145,20 @@
     "list": [
       {
         "current": {
-          "text": "All",
-          "value": "$__all"
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
-        "definition": "{\"find\": \"terms\", \"field\": \"policy_published.domain\", \"size\": 100}\n",
+        "definition": "{\"find\": \"terms\", \"field\": \"policy_published.domain\", \"size\": 100}",
         "includeAll": true,
         "label": "domain",
         "multi": true,
         "name": "domain",
         "options": [],
-        "query": "{\"find\": \"terms\", \"field\": \"policy_published.domain\", \"size\": 100}\n",
+        "query": "{\"find\": \"terms\", \"field\": \"policy_published.domain\", \"size\": 100}",
         "refresh": 1,
         "regex": "",
         "type": "query"
@@ -1162,13 +1166,13 @@
     ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-30d",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "DMARCレポート概要",
   "uid": "ee2lgvv68smbkb",
-  "version": 11,
+  "version": 15,
   "weekStart": ""
 }

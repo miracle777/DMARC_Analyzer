@@ -9,7 +9,6 @@ import time
 import shutil
 from pathlib import Path
 import logging
-from customer_manager import CustomerManager
 from es_setup import setup_elasticsearch_indices
 from analysis_utils import (
     calculate_authentication_rates,
@@ -41,17 +40,8 @@ class DMARCAnalyzer:
         self.es_url = es_url
         self.processed_files = set()
         
-        self.customer_manager = CustomerManager()
-        customer_info = self.customer_manager.get_customer_by_domain(domain)
-        
-        if customer_info is None:
-            self.customer_id = self.customer_manager.register_customer(
-                domain=domain,
-                email=f"admin@{domain}"
-            )
-        else:
-            self.customer_id = customer_info['id']
-            
+
+
         # 初期化を__init__で実行
         self._initialize()
 
@@ -59,8 +49,23 @@ class DMARCAnalyzer:
         """レポートディレクトリ内のXMLファイルを解析"""
         logger.info(f"Analyzing reports in directory: {self.report_directory}")
         
+        # ディレクトリの存在確認を追加
+        if not os.path.exists(self.report_directory):
+            logger.error(f"レポートディレクトリが存在しません: {self.report_directory}")
+            return
+            
+        if not os.path.isdir(self.report_directory):
+            logger.error(f"指定されたパスはディレクトリではありません: {self.report_directory}")
+            return
+            
+        # ディレクトリ内のファイル一覧を表示
+        files = os.listdir(self.report_directory)
+        logger.info(f"Found {len(files)} files in directory")
+        for file in files:
+            logger.info(f"Found file: {file}")
+        
         try:
-            # レポートディレクトリ内の全ファイルを確認
+            # 既存のコード
             for root, _, files in os.walk(self.report_directory):
                 for file in files:
                     file_path = os.path.join(root, file)
@@ -77,6 +82,7 @@ class DMARCAnalyzer:
         except Exception as e:
             logger.error(f"Error analyzing reports: {e}")
             raise
+    
 
     def process_report_file(self, file_path):
         """レポートファイルの処理（重複チェック含む）"""
@@ -147,14 +153,13 @@ class DMARCAnalyzer:
                 return
 
             # 重複チェック
-            if check_duplicate_report(self.es, report['report_id'], self.customer_id):
+            if check_duplicate_report(self.es, report['report_id']):
                 logger.info(f"Skipping duplicate report: {report['report_id']}")
                 return
 
             # 基本メタデータの準備
             base_metadata = {k: v for k, v in report.items() if k != 'records'}
             base_metadata.update({
-                'customer_id': self.customer_id,
                 'analyzed_at': datetime.now().isoformat()
             })
 
@@ -179,7 +184,6 @@ class DMARCAnalyzer:
             self.es.index(
                 index=f"dmarc_stats-{datetime.now():%Y.%m}",
                 document={
-                    'customer_id': self.customer_id,
                     'stats': stats,
                     'timestamp': datetime.now().isoformat()
                 }
@@ -440,14 +444,13 @@ class DMARCAnalyzer:
                 return
 
             # 重複チェック
-            if check_duplicate_report(self.es, report['report_id'], self.customer_id):
+            if check_duplicate_report(self.es, report['report_id']):
                 logger.info(f"Skipping duplicate report: {report['report_id']}")
                 return
 
             # 基本メタデータの準備
             base_metadata = {k: v for k, v in report.items() if k != 'records'}
             base_metadata.update({
-                'customer_id': self.customer_id,
                 'analyzed_at': datetime.now().isoformat()
             })
 
@@ -513,16 +516,24 @@ class DMARCAnalyzer:
 
 
 if __name__ == "__main__":
-    # 環境変数からドメインを取得
-    domain = os.getenv("DOMAIN")
-    if not domain:
-        print("Error: DOMAIN environment variable is not set. Exiting.")
-        sys.exit(1)
+    logger.info("Starting DMARC Analyzer")
+    
+    try:
+        # デフォルトドメインを環境変数から取得
+        default_domain = os.getenv("DEFAULT_DOMAIN", "admin")  # デフォルト値を設定
+        logger.info(f"Using default domain: {default_domain}")
+            
+        # DMARCAnalyzerの初期化
+        analyzer = DMARCAnalyzer(
+            report_directory="/app/files", 
+            extract_directory="/app/files/extracted",
+            es_url="http://elasticsearch:9200",
+            domain=default_domain
+        )
         
-    analyzer = DMARCAnalyzer(
-        report_directory="/app/files", 
-        extract_directory="/app/files/extracted",
-        es_url="http://elasticsearch:9200",
-        domain=domain
-    )
-    analyzer.analyze_reports()
+        analyzer.analyze_reports()
+        logger.info("DMARC analysis completed successfully")
+        
+    except Exception as e:
+        logger.error(f"An error occurred during DMARC analysis: {e}")
+        sys.exit(1)
