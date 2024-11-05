@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 3,
+  "id": 5,
   "links": [],
   "panels": [
     {
@@ -369,7 +369,7 @@
               "type": "sum"
             }
           ],
-          "query": "policy_published.domain:(${domain}) AND （policy_evaluated.dkim: (\"fail\" OR \"neutral\" OR \"softfail\") OR policy_evaluated.spf: (\"fail\" OR \"neutral\" OR \"softfail\")）",
+          "query": "policy_published.domain:(${domain}) AND (policy_evaluated.dkim:(\"fail\" OR \"neutral\" OR \"softfail\") OR policy_evaluated.spf:(\"fail\" OR \"neutral\" OR \"softfail\"))",
           "refId": "B",
           "timeField": "report_date"
         }
@@ -1228,13 +1228,13 @@
     ]
   },
   "time": {
-    "from": "2024-10-06T15:00:00.000Z",
-    "to": "2024-10-07T14:59:59.000Z"
+    "from": "now-30d",
+    "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "DMARCレポート概要",
   "uid": "ce2vsl7rxxjwga",
-  "version": 6,
+  "version": 2,
   "weekStart": ""
 }
