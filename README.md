@@ -177,6 +177,8 @@ dmarc_summary_dashboard.json
 フォレンジックレポートの解析用
 DMARC Forensic_reports Analysis.json
 
+![フォレンジックレポートの解析画面の例](./images/sample2.jpeg)
+
 上記は、実装予定も含みます。
 
 
