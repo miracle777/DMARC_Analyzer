@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
+  "id": 3,
   "links": [],
   "panels": [
     {
@@ -88,7 +88,7 @@
               "type": "sum"
             }
           ],
-          "query": "",
+          "query": "policy_published.domain:(${domain})",
           "queryText": "WITH domain_info AS (\r\n    SELECT \r\n        substr(f.from_address, instr(f.from_address, '@') + 1) as domain,\r\n        COUNT(DISTINCT f.source_ip) as unique_ips,\r\n        COUNT(*) as report_count,\r\n        COUNT(DISTINCT a.organization) as org_count,\r\n        SUM(a.count) as total_mails,\r\n        date(min(f.created_at)) as start_date,\r\n        date(max(f.created_at)) as end_date\r\n    FROM dmarc_forensic f\r\n    LEFT JOIN dmarc_aggregate a ON f.source_ip = a.source_ip\r\n    GROUP BY substr(f.from_address, instr(f.from_address, '@') + 1)\r\n)\r\nSELECT \r\n    domain as \"分析対象ドメイン\",\r\n    org_count as \"レポート送信組織数\",\r\n    unique_ips as \"送信元IP数\",\r\n    report_count as \"レポート数\",\r\n    total_mails as \"総メール数\",\r\n    start_date as \"データ開始日\",\r\n    end_date as \"データ最終日\"\r\nFROM domain_info\r\nORDER BY total_mails DESC;",
           "queryType": "table",
           "rawQueryText": "WITH domain_info AS (\r\n    SELECT \r\n        substr(f.from_address, instr(f.from_address, '@') + 1) as domain,\r\n        COUNT(DISTINCT f.source_ip) as unique_ips,\r\n        COUNT(*) as report_count,\r\n        COUNT(DISTINCT a.organization) as org_count,\r\n        SUM(a.count) as total_mails,\r\n        date(min(f.created_at)) as start_date,\r\n        date(max(f.created_at)) as end_date\r\n    FROM dmarc_forensic f\r\n    LEFT JOIN dmarc_aggregate a ON f.source_ip = a.source_ip\r\n    GROUP BY substr(f.from_address, instr(f.from_address, '@') + 1)\r\n)\r\nSELECT \r\n    domain as \"分析対象ドメイン\",\r\n    org_count as \"レポート送信組織数\",\r\n    unique_ips as \"送信元IP数\",\r\n    report_count as \"レポート数\",\r\n    total_mails as \"総メール数\",\r\n    start_date as \"データ開始日\",\r\n    end_date as \"データ最終日\"\r\nFROM domain_info\r\nORDER BY total_mails DESC;",
@@ -142,9 +142,7 @@
         "minVizWidth": 75,
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "mean"
-          ],
+          "calcs": [],
           "fields": "/^Email reach rate$/",
           "values": false
         },
@@ -155,7 +153,7 @@
       "pluginVersion": "11.3.0",
       "targets": [
         {
-          "alias": "policy_evaluated.disposition",
+          "alias": "spf&dkim",
           "bucketAggs": [
             {
               "field": "report_date",
@@ -168,11 +166,12 @@
           ],
           "metrics": [
             {
+              "field": "count",
               "id": "1",
-              "type": "count"
+              "type": "sum"
             }
           ],
-          "query": "policy_evaluated.disposition:(\"none\" OR \"deliver\") ",
+          "query": "policy_published.domain:(${domain}) AND (policy_evaluated.dkim:pass AND policy_evaluated.spf:pass)",
           "queryText": "WITH domain_info AS (\r\n    SELECT \r\n        substr(f.from_address, instr(f.from_address, '@') + 1) as domain,\r\n        COUNT(DISTINCT f.source_ip) as unique_ips,\r\n        COUNT(*) as report_count,\r\n        COUNT(DISTINCT a.organization) as org_count,\r\n        SUM(a.count) as total_mails,\r\n        date(min(f.created_at)) as start_date,\r\n        date(max(f.created_at)) as end_date\r\n    FROM dmarc_forensic f\r\n    LEFT JOIN dmarc_aggregate a ON f.source_ip = a.source_ip\r\n    GROUP BY substr(f.from_address, instr(f.from_address, '@') + 1)\r\n)\r\nSELECT \r\n    domain as \"分析対象ドメイン\",\r\n    org_count as \"レポート送信組織数\",\r\n    unique_ips as \"送信元IP数\",\r\n    report_count as \"レポート数\",\r\n    total_mails as \"総メール数\",\r\n    start_date as \"データ開始日\",\r\n    end_date as \"データ最終日\"\r\nFROM domain_info\r\nORDER BY total_mails DESC;",
           "queryType": "table",
           "rawQueryText": "WITH domain_info AS (\r\n    SELECT \r\n        substr(f.from_address, instr(f.from_address, '@') + 1) as domain,\r\n        COUNT(DISTINCT f.source_ip) as unique_ips,\r\n        COUNT(*) as report_count,\r\n        COUNT(DISTINCT a.organization) as org_count,\r\n        SUM(a.count) as total_mails,\r\n        date(min(f.created_at)) as start_date,\r\n        date(max(f.created_at)) as end_date\r\n    FROM dmarc_forensic f\r\n    LEFT JOIN dmarc_aggregate a ON f.source_ip = a.source_ip\r\n    GROUP BY substr(f.from_address, instr(f.from_address, '@') + 1)\r\n)\r\nSELECT \r\n    domain as \"分析対象ドメイン\",\r\n    org_count as \"レポート送信組織数\",\r\n    unique_ips as \"送信元IP数\",\r\n    report_count as \"レポート数\",\r\n    total_mails as \"総メール数\",\r\n    start_date as \"データ開始日\",\r\n    end_date as \"データ最終日\"\r\nFROM domain_info\r\nORDER BY total_mails DESC;",
@@ -184,7 +183,7 @@
           "timeField": "report_date"
         },
         {
-          "alias": "",
+          "alias": "Email total",
           "bucketAggs": [
             {
               "field": "report_date",
@@ -207,7 +206,7 @@
               "type": "sum"
             }
           ],
-          "query": "",
+          "query": "policy_published.domain:(${domain})",
           "refId": "B",
           "timeField": "report_date"
         }
@@ -221,14 +220,14 @@
               "left": {
                 "matcher": {
                   "id": "byName",
-                  "options": "policy_evaluated.disposition"
+                  "options": "spf&dkim"
                 }
               },
               "operator": "/",
               "right": {
                 "matcher": {
                   "id": "byName",
-                  "options": "Sum count"
+                  "options": "Email total"
                 }
               }
             },
@@ -246,7 +245,7 @@
               "left": {
                 "matcher": {
                   "id": "byName",
-                  "options": "policy_evaluated.disposition / Sum count"
+                  "options": "spf&dkim / Email total"
                 }
               },
               "operator": "*",
@@ -257,7 +256,8 @@
             "mode": "binary",
             "reduce": {
               "reducer": "sum"
-            }
+            },
+            "replaceFields": false
           }
         }
       ],
@@ -334,7 +334,7 @@
               "type": "sum"
             }
           ],
-          "query": "",
+          "query": "policy_published.domain:(${domain})",
           "queryText": "WITH domain_info AS (\r\n    SELECT \r\n        substr(f.from_address, instr(f.from_address, '@') + 1) as domain,\r\n        COUNT(DISTINCT f.source_ip) as unique_ips,\r\n        COUNT(*) as report_count,\r\n        COUNT(DISTINCT a.organization) as org_count,\r\n        SUM(a.count) as total_mails,\r\n        date(min(f.created_at)) as start_date,\r\n        date(max(f.created_at)) as end_date\r\n    FROM dmarc_forensic f\r\n    LEFT JOIN dmarc_aggregate a ON f.source_ip = a.source_ip\r\n    GROUP BY substr(f.from_address, instr(f.from_address, '@') + 1)\r\n)\r\nSELECT \r\n    domain as \"分析対象ドメイン\",\r\n    org_count as \"レポート送信組織数\",\r\n    unique_ips as \"送信元IP数\",\r\n    report_count as \"レポート数\",\r\n    total_mails as \"総メール数\",\r\n    start_date as \"データ開始日\",\r\n    end_date as \"データ最終日\"\r\nFROM domain_info\r\nORDER BY total_mails DESC;",
           "queryType": "table",
           "rawQueryText": "WITH domain_info AS (\r\n    SELECT \r\n        substr(f.from_address, instr(f.from_address, '@') + 1) as domain,\r\n        COUNT(DISTINCT f.source_ip) as unique_ips,\r\n        COUNT(*) as report_count,\r\n        COUNT(DISTINCT a.organization) as org_count,\r\n        SUM(a.count) as total_mails,\r\n        date(min(f.created_at)) as start_date,\r\n        date(max(f.created_at)) as end_date\r\n    FROM dmarc_forensic f\r\n    LEFT JOIN dmarc_aggregate a ON f.source_ip = a.source_ip\r\n    GROUP BY substr(f.from_address, instr(f.from_address, '@') + 1)\r\n)\r\nSELECT \r\n    domain as \"分析対象ドメイン\",\r\n    org_count as \"レポート送信組織数\",\r\n    unique_ips as \"送信元IP数\",\r\n    report_count as \"レポート数\",\r\n    total_mails as \"総メール数\",\r\n    start_date as \"データ開始日\",\r\n    end_date as \"データ最終日\"\r\nFROM domain_info\r\nORDER BY total_mails DESC;",
@@ -369,7 +369,7 @@
               "type": "sum"
             }
           ],
-          "query": "policy_evaluated.dkim: (\"fail\" OR \"neutral\" OR \"softfail\") OR policy_evaluated.spf: (\"fail\" OR \"neutral\" OR \"softfail\")",
+          "query": "policy_published.domain:(${domain}) AND （policy_evaluated.dkim: (\"fail\" OR \"neutral\" OR \"softfail\") OR policy_evaluated.spf: (\"fail\" OR \"neutral\" OR \"softfail\")）",
           "refId": "B",
           "timeField": "report_date"
         }
@@ -643,7 +643,7 @@
         "stacking": "none",
         "text": {},
         "tooltip": {
-          "mode": "none",
+          "mode": "multi",
           "sort": "asc"
         },
         "xField": "Time",
@@ -666,11 +666,12 @@
           ],
           "metrics": [
             {
+              "field": "count",
               "id": "1",
-              "type": "count"
+              "type": "sum"
             }
           ],
-          "query": "auth_results.spf:pass",
+          "query": "policy_published.domain:(${domain}) AND (policy_evaluated.spf:pass)",
           "queryText": "SELECT \n    date(created_at) || ' 00:00:00' as \"time\",\n    organization as \"組織\",\n    SUM(CASE WHEN spf_result != 'pass' THEN count ELSE 0 END) as \"SPFエラー数\",\n    SUM(CASE WHEN dkim_result != 'pass' THEN count ELSE 0 END) as \"DKIMエラー数\",\n    ROUND(SUM(CASE WHEN spf_result = 'pass' THEN count ELSE 0 END) * 100.0 / SUM(count), 2) as \"SPF成功率\",\n    ROUND(SUM(CASE WHEN dkim_result = 'pass' THEN count ELSE 0 END) * 100.0 / SUM(count), 2) as \"DKIM成功率\"\nFROM dmarc_aggregate\nGROUP BY date(created_at), organization\nORDER BY time;",
           "queryType": "table",
           "rawQueryText": "SELECT \n    date(created_at) || ' 00:00:00' as \"time\",\n    organization as \"組織\",\n    SUM(CASE WHEN spf_result != 'pass' THEN count ELSE 0 END) as \"SPFエラー数\",\n    SUM(CASE WHEN dkim_result != 'pass' THEN count ELSE 0 END) as \"DKIMエラー数\",\n    ROUND(SUM(CASE WHEN spf_result = 'pass' THEN count ELSE 0 END) * 100.0 / SUM(count), 2) as \"SPF成功率\",\n    ROUND(SUM(CASE WHEN dkim_result = 'pass' THEN count ELSE 0 END) * 100.0 / SUM(count), 2) as \"DKIM成功率\"\nFROM dmarc_aggregate\nGROUP BY date(created_at), organization\nORDER BY time;",
@@ -700,11 +701,12 @@
           "hide": false,
           "metrics": [
             {
+              "field": "count",
               "id": "1",
-              "type": "count"
+              "type": "sum"
             }
           ],
-          "query": "auth_results.dkim:pass",
+          "query": "policy_published.domain:(${domain}) AND policy_evaluated.dkim:pass",
           "refId": "B",
           "timeField": "report_date"
         },
@@ -727,11 +729,12 @@
           "hide": false,
           "metrics": [
             {
+              "field": "count",
               "id": "1",
-              "type": "count"
+              "type": "sum"
             }
           ],
-          "query": "auth_results.spf:fail",
+          "query": "policy_published.domain:(${domain}) AND policy_evaluated.spf:fail",
           "refId": "C",
           "timeField": "report_date"
         },
@@ -754,11 +757,12 @@
           "hide": false,
           "metrics": [
             {
+              "field": "count",
               "id": "1",
-              "type": "count"
+              "type": "sum"
             }
           ],
-          "query": "auth_results.dkim:fail",
+          "query": "policy_published.domain:(${domain}) AND auth_results.dkim:fail",
           "refId": "D",
           "timeField": "report_date"
         },
@@ -786,7 +790,7 @@
               "type": "sum"
             }
           ],
-          "query": "",
+          "query": "policy_published.domain:(${domain})",
           "refId": "E",
           "timeField": "report_date"
         }
@@ -1022,8 +1026,9 @@
           "hide": false,
           "metrics": [
             {
+              "field": "count",
               "id": "1",
-              "type": "count"
+              "type": "sum"
             }
           ],
           "query": "policy_published.domain:(${domain}) AND auth_results.spf:fail",
@@ -1049,8 +1054,9 @@
           "hide": false,
           "metrics": [
             {
+              "field": "count",
               "id": "1",
-              "type": "count"
+              "type": "sum"
             }
           ],
           "query": "policy_published.domain:(${domain}) AND auth_results.dkim:fail",
@@ -1071,11 +1077,12 @@
           ],
           "metrics": [
             {
+              "field": "count",
               "id": "1",
-              "type": "count"
+              "type": "sum"
             }
           ],
-          "query": "policy_published.domain:(${domain}) AND auth_results.spf:softfail",
+          "query": "policy_published.domain:(${domain}) AND policy_evaluated.spf:softfail",
           "refId": "A",
           "timeField": "report_date"
         },
@@ -1098,11 +1105,12 @@
           "hide": false,
           "metrics": [
             {
+              "field": "count",
               "id": "1",
-              "type": "count"
+              "type": "sum"
             }
           ],
-          "query": "policy_published.domain:(${domain}) AND auth_results.dkim:neutral",
+          "query": "policy_published.domain:(${domain}) AND policy_evaluated.dkim:neutral",
           "refId": "B",
           "timeField": "report_date"
         },
@@ -1220,13 +1228,13 @@
     ]
   },
   "time": {
-    "from": "now-30d",
-    "to": "now"
+    "from": "2024-10-06T15:00:00.000Z",
+    "to": "2024-10-07T14:59:59.000Z"
   },
   "timepicker": {},
   "timezone": "",
   "title": "DMARCレポート概要",
   "uid": "ce2vsl7rxxjwga",
-  "version": 5,
+  "version": 6,
   "weekStart": ""
 }
