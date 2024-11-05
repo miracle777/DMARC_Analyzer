@@ -17,8 +17,7 @@ from analysis_utils import (
     batch_save_documents
 )
 
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
+
 
 
 # ロギング設定
@@ -45,6 +44,8 @@ class DMARCAnalyzer:
         
         # 初期化を__init__で実行
         self._initialize()
+        
+    
 
     def _initialize(self):
         """初期化処理"""
@@ -119,13 +120,21 @@ class DMARCAnalyzer:
             raise
 
     def process_report_file(self, file_path):
-        """レポートファイルの処理（重複チェック含む）"""
-        if file_path in self.processed_files:
-            logger.info(f"Skipping duplicate file: {file_path}")
+        """レポートファイルの処理（ロック機能付き）"""
+        lock_file = file_path + '.lock'
+        if os.path.exists(lock_file):
+            logger.info(f"File is being processed: {file_path}")
             return
 
-        self.processed_files.add(file_path)
-        self.process_xml_file(file_path)
+        try:
+            with open(lock_file, 'w') as f:
+                f.write(str(datetime.now()))
+            
+            self.process_xml_file(file_path)
+            
+        finally:
+            if os.path.exists(lock_file):
+                os.remove(lock_file)
 
     def process_xml_file(self, xml_file_path: str) -> None:
         """XMLファイルを直接処理してElasticsearchに保存"""
@@ -599,63 +608,8 @@ class DMARCAnalyzer:
             logger.error(f"アーカイブ展開エラー {file_path}: {e}")
             return []
 
-    def watch_directory(self):
-            """レポートディレクトリの監視を開始"""
-            print("\n=== DMARCレポート監視を開始しました ===")
-            print(f"監視フォルダ: {self.report_directory}")
-            logger.info(f"Starting directory watch for: {self.report_directory}")
-            
-            observer = Observer()
-            event_handler = DMARCHandler(self)
-            observer.schedule(event_handler, self.report_directory, recursive=False)
-            observer.start()
-            
-            try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                observer.stop()
-                print("\n監視を停止しました")
-            observer.join()
+    
 
-class DMARCHandler(FileSystemEventHandler):
-    def __init__(self, analyzer):
-        self.analyzer = analyzer
-
-    def on_created(self, event):
-        if event.is_directory:
-            return
-        file_path = event.src_path
-        print(f"\n📁 新しいファイルを検出: {os.path.basename(file_path)}")
-        logger.info(f"新しいファイルを検出: {file_path}")
-        
-        print("🔄 解析を開始します...")
-        if file_path.endswith('.xml'):
-            self.analyzer.process_report_file(file_path)
-        elif file_path.endswith(('.zip', '.gz')):
-            extracted_files = self.analyzer._extract_nested_archives(
-                file_path, 
-                self.analyzer.extract_directory
-            )
-            for extracted_file in extracted_files:
-                if extracted_file.endswith('.xml'):
-                    self.analyzer.process_report_file(extracted_file)
-        print("✅ 解析が完了しました")
-
-    def on_modified(self, event):
-        if event.is_directory:
-            return
-        file_path = event.src_path
-        print(f"\n📝 ファイルの変更を検出: {os.path.basename(file_path)}")
-        logger.info(f"ファイルの変更を検出: {file_path}")
-
-    def on_deleted(self, event):
-        if event.is_directory:
-            return
-        file_path = event.src_path
-        print(f"\n🗑️ ファイルの削除を検出: {os.path.basename(file_path)}")
-        logger.info(f"ファイルの削除を検出: {file_path}")            
-        
 if __name__ == "__main__":
     print("\n=== DMARC解析システムを起動します ===")
     logger.info("Starting DMARC Analyzer")
@@ -686,21 +640,31 @@ if __name__ == "__main__":
         print("ユーザー名: admin")
         print("パスワード: admin")
         
-        # ディレクトリ監視を開始
-        observer = Observer()
-        event_handler = DMARCHandler(analyzer)
-        observer.schedule(event_handler, analyzer.report_directory, recursive=False)
-        observer.start()
+        print("\n=== ファイル監視を開始します ===")
+        print(f"監視対象ディレクトリ: /app/files")
+        logger.info("Starting file monitoring")
         
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            observer.stop()
-            print("\n監視を停止しました")
-        observer.join()
+        # ディレクトリの存在確認とパーミッション
+        if not os.path.exists("/app/files"):
+            print("❌ 監視対象ディレクトリが存在しません")
+            logger.error("Monitor directory does not exist")
+            os.makedirs("/app/files")
+            print("✅ ディレクトリを作成しました")
+            
+        permissions = oct(os.stat("/app/files").st_mode)[-3:]
+        print(f"📁 ディレクトリのパーミッション: {permissions}")
         
+        # ディレクトリの内容を表示
+        print("\n📂 現在のディレクトリ内容:")
+        for root, dirs, files in os.walk("/app/files"):
+            print(f"ディレクトリ: {root}")
+            for d in dirs:
+                print(f" - Dir: {d}")
+            for f in files:
+                print(f" - File: {f}")
+        
+            
     except Exception as e:
-        logger.error(f"An error occurred: {e}")
+        logger.error(f"An error occurred: {e}", exc_info=True)
         print(f"\n❌ エラーが発生しました: {e}")
         sys.exit(1)

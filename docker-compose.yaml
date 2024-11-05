@@ -31,6 +31,20 @@ services:
       timeout: 10s
       retries: 5
       start_period: 40s
+    develop:
+      watch:
+        - action: sync
+          path: ./files
+          target: /app/files
+          ignore:
+            - "**/extracted/**"
+            - "**/extracted"
+            - "**/*.tmp"
+            - "**/*.processing"
+            - "**/*.lock"
+        - action: sync+restart
+          path: ./src
+          target: /app/src
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.17.14
