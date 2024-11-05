@@ -265,8 +265,10 @@ class DMARCAnalyzer:
     def _parse_forensic_report(self, root):
         """フォレンジックレポートのパース"""
         try:
+            # 基本メタデータ
             parsed_data = {
                 "@timestamp": datetime.now().isoformat(),
+                "report_date": datetime.now().isoformat(),
                 "feedback_type": "failure report",
                 "version": root.findtext('version', '1.0'),
                 "report_metadata": {
@@ -285,6 +287,69 @@ class DMARCAnalyzer:
                     "spf": identity_alignment.findtext('spf', 'false').lower() == 'true'
                 }
 
+            # Original Mail Data とIPアドレスの抽出
+            original_mail = root.find('original_mail_data')
+            if original_mail is not None and original_mail.text:
+                import base64
+                try:
+                    # オリジナルのエンコーディング情報を保持
+                    original_encoding = original_mail.get('encoding', 'base64')
+                    
+                    # Base64デコード
+                    decoded_content = base64.b64decode(original_mail.text).decode('utf-8', errors='ignore')
+                    
+                    # デコードされたコンテンツを保存
+                    parsed_data["original_mail_data"] = {
+                        "content": decoded_content,
+                        "encoding": original_encoding
+                    }
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to decode mail content: {e}")
+                    parsed_data["original_mail_data"] = {
+                        "content": original_mail.text,
+                        "encoding": original_mail.get('encoding', 'unknown')
+                    }
+
+            # Source Information
+            source = root.find('.//source')
+            if source is not None:
+                ip_address = source.findtext('ip_address', '0.0.0.0')
+                smtp_hostname = source.findtext('smtp_hostname', 'unknown')
+                parsed_data["source"] = {
+                    "ip_address": ip_address,
+                    "smtp_hostname": smtp_hostname
+                }
+            else:
+                parsed_data["source"] = {
+                    "ip_address": "0.0.0.0",
+                    "smtp_hostname": "unknown"
+                }
+                logger.warning("No source information found in report")
+
+            # Auth Results with human readable results
+            auth_results = root.find('auth_results')
+            if auth_results is not None:
+                parsed_data["auth_results"] = {
+                    "dkim": {
+                        "domain": auth_results.findtext('.//dkim/domain', 'unknown'),
+                        "selector": auth_results.findtext('.//dkim/selector', 'unknown'),
+                        "result": auth_results.findtext('.//dkim/result', 'none'),
+                        "human_result": self._get_human_readable_result('dkim', auth_results.findtext('.//dkim/result', 'none'))
+                    },
+                    "spf": {
+                        "domain": auth_results.findtext('.//spf/domain', 'unknown'),
+                        "scope": auth_results.findtext('.//spf/scope', 'unknown'),
+                        "result": auth_results.findtext('.//spf/result', 'none'),
+                        "human_result": self._get_human_readable_result('spf', auth_results.findtext('.//spf/result', 'none'))
+                    },
+                    "dmarc": {
+                        "domain": auth_results.findtext('.//dmarc/domain', 'unknown'),
+                        "result": auth_results.findtext('.//dmarc/result', 'none'),
+                        "human_result": self._get_human_readable_result('dmarc', auth_results.findtext('.//dmarc/result', 'none'))
+                    }
+                }
+
             # Failure Details
             failure_details = root.find('failure_details')
             if failure_details is not None:
@@ -292,35 +357,111 @@ class DMARCAnalyzer:
                     "reason": failure_details.findtext('reason', 'unknown')
                 }
 
-            # Auth Results
-            auth_results = root.find('auth_results')
-            if auth_results is not None:
-                parsed_data["auth_results"] = {
-                    "dkim": {
-                        "domain": auth_results.findtext('.//dkim/domain', 'unknown'),
-                        "selector": auth_results.findtext('.//dkim/selector', 'unknown'),
-                        "result": auth_results.findtext('.//dkim/result', 'none')
-                    },
-                    "spf": {
-                        "domain": auth_results.findtext('.//spf/domain', 'unknown'),
-                        "scope": auth_results.findtext('.//spf/scope', 'unknown'),
-                        "result": auth_results.findtext('.//spf/result', 'none')
-                    }
-                }
-
-            # Original Mail Data
-            original_mail = root.find('original_mail_data')
-            if original_mail is not None:
-                parsed_data["original_mail_data"] = {
-                    "content": original_mail.text if original_mail.text else '',
-                    "encoding": original_mail.get('encoding', 'unknown')
-                }
-
             return parsed_data
 
         except Exception as e:
             logger.error(f"Error parsing forensic report: {e}", exc_info=True)
             return None
+
+    def _get_human_readable_result(self, auth_type: str, result: str) -> str:
+        """認証結果のヒューマンリーダブルな説明を生成"""
+        explanations = {
+            'dkim': {
+                'pass': '電子署名が正常に検証されました',
+                'fail': '電子署名の検証に失敗しました',
+                'neutral': '検証結果は中立です',
+                'none': '電子署名が見つかりませんでした'
+            },
+            'spf': {
+                'pass': '送信元IPアドレスは承認されています',
+                'fail': '送信元IPアドレスは承認されていません',
+                'softfail': '送信元IPアドレスは疑わしいとマークされています',
+                'neutral': '検証結果は中立です',
+                'none': 'SPFレコードが見つかりませんでした'
+            },
+            'dmarc': {
+                'pass': 'DMARCポリシーに準拠しています',
+                'fail': 'DMARCポリシーに違反しています',
+                'none': 'DMARCポリシーが見つかりませんでした'
+            }
+        }
+        
+        return explanations.get(auth_type, {}).get(result.lower(), '不明な結果です')
+
+    def _parse_mail_headers(self, mail_content: str) -> dict:
+        """メールヘッダーをパース"""
+        if not mail_content:
+            return {}
+
+        headers = {
+            'from': '',
+            'to': '',
+            'subject': '',
+            'date': None
+        }
+
+        try:
+            # メールヘッダー部分を抽出
+            header_lines = []
+            for line in mail_content.split('\n'):
+                if line.strip() == '':
+                    break
+                header_lines.append(line)
+
+            current_header = None
+            current_value = ''
+
+            for line in header_lines:
+                if line.startswith(' ') or line.startswith('\t'):
+                    # 継続行
+                    current_value += ' ' + line.strip()
+                else:
+                    # 新しいヘッダー
+                    if current_header:
+                        if current_header.lower() in headers:
+                            headers[current_header.lower()] = current_value.strip()
+                    
+                    if ':' in line:
+                        current_header, value = line.split(':', 1)
+                        current_header = current_header.lower()
+                        current_value = value.strip()
+
+            # 最後のヘッダーを処理
+            if current_header and current_header.lower() in headers:
+                headers[current_header.lower()] = current_value.strip()
+
+            # 日付の変換
+            if headers['date']:
+                try:
+                    headers['date'] = datetime.strptime(
+                        headers['date'], 
+                        '%a, %d %b %Y %H:%M:%S %z'
+                    ).isoformat()
+                except ValueError:
+                    headers['date'] = None
+
+        except Exception as e:
+            logger.error(f"Error parsing mail headers: {e}")
+
+        return headers
+    
+    def _is_valid_ip(self, ip_string: str) -> bool:
+        """IPアドレスが有効かどうかを確認"""
+        if not ip_string or ip_string.lower() == 'unknown':
+            return False
+            
+        import re
+        # 簡易的なIPv4アドレスの正規表現パターン
+        pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+        if not re.match(pattern, ip_string):
+            return False
+        
+        # 各オクテットが0-255の範囲内かチェック
+        try:
+            return all(0 <= int(octet) <= 255 for octet in ip_string.split('.'))
+        except (ValueError, AttributeError):
+            return False
+        
 
     def _save_aggregate_report(self, report):
         """集計レポートの保存"""

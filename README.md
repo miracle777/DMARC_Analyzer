@@ -1,7 +1,5 @@
 # DMARCレポート解析ツール
 
-![解析画面の例](./images/sample.jpeg)
-
 
 ## 概要
 
@@ -173,6 +171,8 @@ http://localhost:3000
 
 aggregate_reportのレポート解析
 dmarc_summary_dashboard.json
+
+![解析画面の例](./images/sample.jpeg)
 
 フォレンジックレポートの解析用
 DMARC Forensic_reports Analysis.json
