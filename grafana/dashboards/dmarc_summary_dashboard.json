@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 5,
+  "id": 6,
   "links": [],
   "panels": [
     {
@@ -427,6 +427,31 @@
       "type": "gauge"
     },
     {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 7,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "グラフの表示でNaNが表示されるときは、集計期間を調整してください。",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.3.0",
+      "title": "注意事項",
+      "type": "text"
+    },
+    {
       "datasource": {
         "type": "elasticsearch",
         "uid": "PCFA1C57C50845E0D"
@@ -624,7 +649,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 11
       },
       "id": 1,
       "options": {
@@ -905,7 +930,7 @@
         "h": 4,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 23
       },
       "id": 5,
       "options": {
@@ -971,8 +996,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -988,7 +1012,7 @@
         "h": 13,
         "w": 24,
         "x": 0,
-        "y": 24
+        "y": 27
       },
       "id": 6,
       "options": {
@@ -1207,12 +1231,8 @@
     "list": [
       {
         "current": {
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": "All",
+          "value": "$__all"
         },
         "definition": "{\"find\": \"terms\", \"field\": \"policy_published.domain\", \"size\": 100}",
         "includeAll": true,
@@ -1228,13 +1248,13 @@
     ]
   },
   "time": {
-    "from": "now-30d",
-    "to": "now"
+    "from": "2024-10-09T02:59:57.500Z",
+    "to": "2024-10-10T02:59:56.500Z"
   },
   "timepicker": {},
   "timezone": "",
   "title": "DMARCレポート概要",
-  "uid": "ce2vsl7rxxjwga",
-  "version": 2,
+  "uid": "ae319u2ts09hca",
+  "version": 1,
   "weekStart": ""
 }
